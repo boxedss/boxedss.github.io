@@ -45,8 +45,8 @@
 
         // --- Demo Storage Workarounds ---
         const DB_KEYS = {
-            BUILDINGS: 'pm_demo_buildings_v2',
-            READINGS: 'pm_demo_readings_v2'
+            BUILDINGS: 'pm_demo_buildings_v3', // Incremented version to ensure new schema loads
+            READINGS: 'pm_demo_readings_v3'
         };
 
         const loadData = (key) => {
@@ -148,6 +148,9 @@
             const [loading, setLoading] = useState(true);
             const [toast, setToast] = useState(null);
 
+            // Dashboard State
+            const [dashFilter, setDashFilter] = useState('all');
+
             // Modals
             const [isAddModalOpen, setIsAddModalOpen] = useState(false);
             const [isReadingModalOpen, setIsReadingModalOpen] = useState(false);
@@ -187,10 +190,23 @@
                 setTimeout(() => setToast(null), 3000);
             };
 
+            // Calculate days since a date
+            const getDaysSince = (dateString) => {
+                if (!dateString) return null;
+                const diffTime = Math.abs(new Date() - new Date(dateString));
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            };
+
             const handleAddBuilding = (e) => {
                 e.preventDefault();
                 const bId = Date.now().toString();
-                const building = { ...newBuilding, id: bId, createdAt: new Date().toISOString() };
+                // Initialize lastInvoiced object
+                const building = { 
+                    ...newBuilding, 
+                    id: bId, 
+                    createdAt: new Date().toISOString(),
+                    lastInvoiced: { water: null, electricity: null, gas: null, waste: null }
+                };
                 const updatedBuildings = [building, ...buildings];
                 
                 let updatedReadings = [...historyLog];
@@ -268,6 +284,29 @@
                 showToast("Meter reading synchronised", "success");
             };
 
+            const handlePrintInvoice = () => {
+                // 1. Update the building's lastInvoiced date for this utility
+                const updatedBuildings = buildings.map(b => {
+                    if (b.id === invoiceData.buildingId) {
+                        return {
+                            ...b,
+                            lastInvoiced: {
+                                ...b.lastInvoiced,
+                                [invoiceData.utility]: new Date().toISOString()
+                            }
+                        };
+                    }
+                    return b;
+                });
+                
+                setBuildings(updatedBuildings);
+                saveData(DB_KEYS.BUILDINGS, updatedBuildings);
+                
+                // 2. Print
+                window.print();
+                showToast("Invoice recorded and printed", "success");
+            };
+
             const handleDeleteBuilding = () => {
                 const updatedBuildings = buildings.filter(b => b.id !== selectedBuilding.id);
                 const updatedReadings = historyLog.filter(r => r.buildingId !== selectedBuilding.id);
@@ -280,10 +319,27 @@
             };
 
             const stats = useMemo(() => {
-                const cost = historyLog.reduce((acc, curr) => acc + (parseFloat(curr.cost) || 0), 0);
-                const usage = historyLog.reduce((acc, curr) => acc + (parseFloat(curr.usage) || 0), 0);
-                return { cost, usage, count: historyLog.length };
-            }, [historyLog]);
+                // Filter logs based on dashboard filter if needed, but usually stats are global
+                // Let's filter stats by the dashboard utility filter too for consistency
+                let filteredLogs = historyLog;
+                if (dashFilter !== 'all') {
+                    filteredLogs = historyLog.filter(l => l.utility === dashFilter);
+                }
+
+                const cost = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.cost) || 0), 0);
+                const usage = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.usage) || 0), 0);
+                return { cost, usage, count: filteredLogs.length };
+            }, [historyLog, dashFilter]);
+
+            // Filter buildings for the invoicing status list
+            const filteredBuildings = useMemo(() => {
+                return buildings.filter(b => {
+                    if (dashFilter === 'all') return true;
+                    // Check if building has the selected utility
+                    const propName = `has${dashFilter.charAt(0).toUpperCase() + dashFilter.slice(1)}`;
+                    return b[propName] === true;
+                });
+            }, [buildings, dashFilter]);
 
             if (loading) return null;
 
@@ -332,31 +388,101 @@
                         </div>
 
                         {activeTab === 'dashboard' && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
-                                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
-                                    <Icon name="Euro" size={80} className="absolute -bottom-4 -right-4 opacity-10 group-hover:scale-110 transition-transform" />
-                                    <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-2 text-white/70">Total Expenditure</p>
-                                    <h3 className="text-4xl font-black">€{stats.cost.toFixed(2)}</h3>
-                                    <div className="mt-6 flex items-center gap-2 text-[10px] font-bold bg-white/20 py-1.5 px-3 rounded-full w-fit">
-                                        <Icon name="Activity" size={12} />
-                                        <span>OFFLINE SESSION ACTIVE</span>
+                            <div className="space-y-8">
+                                {/* Dashboard Filters */}
+                                <div className="flex flex-wrap gap-2 animate-in">
+                                    {['all', 'water', 'electricity', 'gas', 'waste'].map(u => (
+                                        <button
+                                            key={u}
+                                            onClick={() => setDashFilter(u)}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
+                                                dashFilter === u 
+                                                ? 'bg-slate-800 text-white border-slate-800' 
+                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            {u}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
+                                    <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
+                                        <Icon name="Euro" size={80} className="absolute -bottom-4 -right-4 opacity-10 group-hover:scale-110 transition-transform" />
+                                        <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-2 text-white/70">Total Expenditure ({dashFilter})</p>
+                                        <h3 className="text-4xl font-black">€{stats.cost.toFixed(2)}</h3>
+                                        <div className="mt-6 flex items-center gap-2 text-[10px] font-bold bg-white/20 py-1.5 px-3 rounded-full w-fit">
+                                            <Icon name="Activity" size={12} />
+                                            <span>OFFLINE SESSION ACTIVE</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Total Consumption</p>
+                                        <h3 className="text-4xl font-black text-slate-800">{stats.usage.toFixed(1)} <span className="text-sm font-medium text-slate-400">units</span></h3>
+                                        <div className="mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-blue-500 rounded-full" style={{ width: '65%' }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                        <div>
+                                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Active Units</p>
+                                            <h3 className="text-4xl font-black text-slate-800">{buildings.length}</h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-4">
+                                            <Icon name="CheckCircle" size={14} className="text-emerald-500" /> Demo Persistence Enabled
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Total Consumption</p>
-                                    <h3 className="text-4xl font-black text-slate-800">{stats.usage.toFixed(1)} <span className="text-sm font-medium text-slate-400">units</span></h3>
-                                    <div className="mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-500 rounded-full" style={{ width: '65%' }}></div>
+
+                                {/* Invoicing Status Section */}
+                                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in">
+                                    <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                                        <h2 className="text-lg font-black text-slate-800">Invoicing Status</h2>
                                     </div>
-                                </div>
-                                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                    <div>
-                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Active Units</p>
-                                        <h3 className="text-4xl font-black text-slate-800">{buildings.length}</h3>
+                                    <div className="divide-y divide-slate-100">
+                                        {filteredBuildings.length === 0 ? (
+                                            <div className="p-12 text-center text-slate-400 text-sm">No units found for this filter.</div>
+                                        ) : (
+                                            filteredBuildings.map(b => (
+                                                <div key={b.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                                                    <div>
+                                                        <p className="font-bold text-slate-800">{b.name}</p>
+                                                        <p className="text-xs text-slate-500">{b.address}</p>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {['water', 'electricity', 'gas', 'waste'].map(u => {
+                                                            const hasUtil = b[`has${u.charAt(0).toUpperCase() + u.slice(1)}`];
+                                                            if (!hasUtil || (dashFilter !== 'all' && dashFilter !== u)) return null;
+
+                                                            const lastInv = b.lastInvoiced?.[u];
+                                                            const days = lastInv ? getDaysSince(lastInv) : 999;
+                                                            
+                                                            let statusColor = "bg-red-500"; // Default > 31 or null
+                                                            let statusText = "Overdue / Never";
+                                                            
+                                                            if (days < 25) {
+                                                                statusColor = "bg-emerald-500";
+                                                                statusText = `${days} days ago`;
+                                                            } else if (days <= 31) {
+                                                                statusColor = "bg-orange-500";
+                                                                statusText = "Due Soon";
+                                                            }
+
+                                                            return (
+                                                                <div key={u} className="flex items-center gap-2 bg-slate-100 rounded-full pl-2 pr-4 py-1.5 border border-slate-200">
+                                                                    <div className={`w-3 h-3 rounded-full ${statusColor} shadow-sm`}></div>
+                                                                    <div className="flex flex-col leading-none">
+                                                                        <span className="text-[10px] font-bold uppercase text-slate-600">{u}</span>
+                                                                        <span className="text-[9px] font-medium text-slate-400">{statusText}</span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
-                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-4">
-                                        <Icon name="CheckCircle" size={14} className="text-emerald-500" /> Demo Persistence Enabled
-                                    </p>
                                 </div>
                             </div>
                         )}
@@ -588,7 +714,7 @@
                                 </div>
                                 <div className="flex gap-4">
                                     <Button variant="secondary" className="flex-1 py-4" icon="Share2" onClick={() => showToast("Feature simulated in demo", "info")}>Share Copy</Button>
-                                    <Button icon="Printer" className="flex-1 py-4" onClick={() => window.print()}>Print / PDF</Button>
+                                    <Button icon="Printer" className="flex-1 py-4" onClick={handlePrintInvoice}>Print / PDF</Button>
                                 </div>
                             </div>
                         )}
