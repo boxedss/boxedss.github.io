@@ -3,850 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paul Precision Metering (Demo)</title>
-    
+    <title>Paul Precision Metering - Premium Utility Management</title>
+    <!-- Favicon: White Water Drop in Blue Square -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232563eb'/%3E%3Cpath d='M12 22c5.5 0 10-4.5 10-10 0-5.5-10-10-10-10S2 6.5 2 12c0 5.5 4.5 10 10 10z' fill='white'/%3E%3C/svg%3E" type="image/svg+xml">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Babel for JSX transformation (Pinned to 7.23.6) -->
-    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
-
-    <!-- Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- React and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-    <!-- Import Map for React and Lucide (No Firebase) -->
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@18.2.0",
-            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        @media print {
+            body * { visibility: hidden; }
+            #invoice-preview, #invoice-preview * { visibility: visible; }
+            #invoice-preview { position: absolute; left: 0; top: 0; width: 100%; border: none; box-shadow: none; }
         }
-    }
-    </script>
+    </style>
 </head>
-<body class="bg-gray-50">
-    <div id="root"></div>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root">
+        <div class="flex flex-col justify-center items-center h-screen bg-slate-50">
+            <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-slate-500 font-medium">Initialising Demo Environment...</p>
+        </div>
+    </div>
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            Plus, 
-            Droplets, 
-            Zap, 
-            FileText, 
-            History, 
-            Settings, 
-            User as UserIcon,
-            MapPin, 
-            X,
-            Printer,
-            Edit2,
-            Trash2,
-            Flame,
-            Waves,
-            LayoutDashboard,
-            TrendingUp,
-            Euro
-        } from 'lucide-react';
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-        // --- Local Storage Helpers ---
-        const getLocalData = (key) => {
+        // --- Demo Storage Workarounds ---
+        const DB_KEYS = {
+            BUILDINGS: 'pm_demo_buildings_v2',
+            READINGS: 'pm_demo_readings_v2'
+        };
+
+        const loadData = (key) => {
             try {
-                const item = localStorage.getItem(key);
-                return item ? JSON.parse(item) : [];
-            } catch (error) {
-                console.error("Error reading local storage", error);
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.warn("LocalStorage access denied, using in-memory session.");
                 return [];
             }
         };
 
-        const setLocalData = (key, data) => {
+        const saveData = (key, data) => {
             try {
                 localStorage.setItem(key, JSON.stringify(data));
-            } catch (error) {
-                console.error("Error writing to local storage", error);
+            } catch (e) {
+                console.warn("Could not save to LocalStorage.");
             }
         };
 
-        // --- Components ---
+        // --- Stable Icon Component ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef(null);
+            
+            useEffect(() => {
+                const renderIcon = () => {
+                    if (window.lucide && iconRef.current) {
+                        const normalizedName = name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+                        iconRef.current.setAttribute('data-lucide', normalizedName);
+                        
+                        window.lucide.createIcons({
+                            icons: window.lucide.icons,
+                            attrs: {
+                                width: size,
+                                height: size,
+                                class: className,
+                                'stroke-width': 2
+                            }
+                        });
+                        return true;
+                    }
+                    return false;
+                };
 
-        const LoadingSpinner = () => (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        );
+                if (!renderIcon()) {
+                    const timer = setInterval(() => {
+                        if (renderIcon()) clearInterval(timer);
+                    }, 50);
+                    return () => clearInterval(timer);
+                }
+            }, [name, size, className]);
 
-        const Modal = ({ isOpen, onClose, title, children }) => {
+            return <i ref={iconRef} className={`inline-flex shrink-0 items-center justify-center ${className}`} style={{ width: size, height: size }}></i>;
+        };
+
+        // --- UI Components ---
+        const Modal = ({ isOpen, onClose, title, children, size = "default" }) => {
             if (!isOpen) return null;
+            const sizes = { default: "max-w-2xl", large: "max-w-4xl", small: "max-w-md" };
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col">
-                        <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-                            <h2 className="text-xl font-bold text-gray-800">{title}</h2>
-                            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
-                                <X size={20} />
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+                    <div className={`relative bg-white rounded-3xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] overflow-hidden flex flex-col`}>
+                        <div className="shrink-0 bg-gradient-to-r from-blue-600 to-cyan-500 p-6 flex justify-between items-center text-white">
+                            <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+                            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-all">
+                                <Icon name="X" size={20} />
                             </button>
                         </div>
-                        <div className="p-4 flex-1">
-                            {children}
-                        </div>
+                        <div className="p-6 flex-1 overflow-y-auto">{children}</div>
                     </div>
                 </div>
             );
         };
 
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-4 ${className}`}>
-                {children}
-            </div>
-        );
+        const Button = ({ children, variant = "primary", icon, onClick, disabled, type = "button", className = "" }) => {
+            const styles = {
+                primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-md",
+                secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm",
+                danger: "bg-red-600 text-white hover:bg-red-700 shadow-md",
+                ghost: "text-slate-500 hover:bg-slate-100"
+            };
+            return (
+                <button
+                    type={type} onClick={onClick} disabled={disabled}
+                    className={`px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ${styles[variant]} ${className}`}
+                >
+                    {icon && <Icon name={icon} size={18} />}
+                    {children}
+                </button>
+            );
+        };
 
-        const StatCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-start justify-between">
-                <div>
-                    <p className="text-sm text-gray-500 font-medium mb-1">{title}</p>
-                    <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
-                    {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
-                </div>
-                <div className={`p-2 rounded-lg ${colorClass}`}>
-                    <Icon size={20} />
-                </div>
-            </div>
-        );
-
-        // --- Main Application Component ---
-
+        // --- Main App ---
         function App() {
-            // App State
             const [activeTab, setActiveTab] = useState('dashboard');
             const [buildings, setBuildings] = useState([]);
             const [historyLog, setHistoryLog] = useState([]);
             const [loading, setLoading] = useState(true);
-            
-            // Modal States
+            const [toast, setToast] = useState(null);
+
+            // Modals
             const [isAddModalOpen, setIsAddModalOpen] = useState(false);
             const [isReadingModalOpen, setIsReadingModalOpen] = useState(false);
             const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
             const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-            
-            // Interaction States
-            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            // Selections
             const [selectedBuilding, setSelectedBuilding] = useState(null);
             const [selectedUtility, setSelectedUtility] = useState(null);
             const [lastReading, setLastReading] = useState(null);
+            const [invoiceData, setInvoiceData] = useState(null);
 
-            // Dashboard Filters
-            const [dashFilterPeriod, setDashFilterPeriod] = useState('all'); // all, month, year
-            const [dashFilterUtility, setDashFilterUtility] = useState('all');
+            // Settings
+            const [includeVat, setIncludeVat] = useState(true);
+            const [vatRate, setVatRate] = useState(13.5);
 
             // Form States
             const [newBuilding, setNewBuilding] = useState({
-                name: '',
-                address: '',
-                tenantName: '',
-                tenantEmail: '',
-                
-                hasWater: true,
-                waterRate: 1.50,
-                initialWater: '', 
-                
-                hasElectricity: true,
-                elecRate: 0.34,
-                initialElec: '',
-
-                hasGas: false,
-                gasRate: 0.11,
-                initialGas: '',
-
-                hasWaste: false,
-                wasteRate: 1.20,
-                initialWaste: ''
+                name: '', address: '', tenantName: '', tenantEmail: '',
+                hasWater: true, waterRate: 1.50, initialWater: '',
+                hasElectricity: true, elecRate: 0.34, initialElec: '',
+                hasGas: false, gasRate: 0.11, initialGas: '',
+                hasWaste: false, wasteRate: 1.20, initialWaste: ''
             });
-
             const [currentReading, setCurrentReading] = useState('');
-            const [customRate, setCustomRate] = useState('');
-            
-            // VAT States
-            const [includeVat, setIncludeVat] = useState(true);
-            const [vatRate, setVatRate] = useState(13.5);
-            
-            const [invoiceData, setInvoiceData] = useState(null);
 
-            // --- Load Data on Mount ---
             useEffect(() => {
-                const loadData = () => {
-                    const loadedBuildings = getLocalData('ppm_buildings');
-                    // Sort by newest
-                    loadedBuildings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                    
-                    const loadedHistory = getLocalData('ppm_readings');
-                    // Sort by newest
-                    loadedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                    setBuildings(loadedBuildings);
-                    setHistoryLog(loadedHistory);
-                    setLoading(false);
-                };
-                
-                // Simulate a tiny network delay for realism
-                setTimeout(loadData, 500);
+                const b = loadData(DB_KEYS.BUILDINGS);
+                const r = loadData(DB_KEYS.READINGS);
+                setBuildings(b);
+                setHistoryLog(r);
+                setLoading(false);
             }, []);
 
-            // --- Computed Dashboard Stats ---
+            const showToast = (message, type = "info") => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 3000);
+            };
 
-            const dashboardStats = useMemo(() => {
-                let filteredLogs = [...historyLog];
-                const now = new Date();
+            const handleAddBuilding = (e) => {
+                e.preventDefault();
+                const bId = Date.now().toString();
+                const building = { ...newBuilding, id: bId, createdAt: new Date().toISOString() };
+                const updatedBuildings = [building, ...buildings];
                 
-                // Time Filter
-                if (dashFilterPeriod === 'month') {
-                    filteredLogs = filteredLogs.filter(log => {
-                        const d = new Date(log.date);
-                        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                    });
-                } else if (dashFilterPeriod === 'year') {
-                    filteredLogs = filteredLogs.filter(log => {
-                        const d = new Date(log.date);
-                        return d.getFullYear() === now.getFullYear();
-                    });
-                }
+                let updatedReadings = [...historyLog];
+                const utilities = [
+                    { type: 'water', active: newBuilding.hasWater, val: newBuilding.initialWater, rate: newBuilding.waterRate },
+                    { type: 'electricity', active: newBuilding.hasElectricity, val: newBuilding.initialElec, rate: newBuilding.elecRate },
+                    { type: 'gas', active: newBuilding.hasGas, val: newBuilding.initialGas, rate: newBuilding.gasRate },
+                    { type: 'waste', active: newBuilding.hasWaste, val: newBuilding.initialWaste, rate: newBuilding.wasteRate }
+                ];
 
-                // Utility Filter
-                if (dashFilterUtility !== 'all') {
-                    filteredLogs = filteredLogs.filter(log => log.utility === dashFilterUtility);
-                }
-
-                const totalUsage = filteredLogs.reduce((acc, log) => acc + (Number(log.usage) || 0), 0);
-                const totalCost = filteredLogs.reduce((acc, log) => {
-                    if (log.totalBill) return acc + Number(log.totalBill);
-                    return acc + ((Number(log.usage) || 0) * (Number(log.rateSnap) || 0));
-                }, 0);
-
-                const utilityBreakdown = {
-                    water: 0,
-                    electricity: 0,
-                    gas: 0,
-                    waste: 0
-                };
-
-                filteredLogs.forEach(log => {
-                    if (utilityBreakdown[log.utility] !== undefined) {
-                        const cost = log.totalBill || ((Number(log.usage) || 0) * (Number(log.rateSnap) || 0));
-                        utilityBreakdown[log.utility] += cost;
+                utilities.forEach(u => {
+                    if (u.active && u.val) {
+                        updatedReadings.push({
+                            id: Math.random().toString(),
+                            buildingId: bId,
+                            buildingName: newBuilding.name,
+                            utility: u.type,
+                            reading: parseFloat(u.val) || 0,
+                            rate: parseFloat(u.rate) || 0,
+                            usage: 0, cost: 0,
+                            timestamp: new Date().toISOString()
+                        });
                     }
                 });
 
-                return {
-                    totalUsage,
-                    totalCost,
-                    count: filteredLogs.length,
-                    utilityBreakdown
-                };
-            }, [historyLog, dashFilterPeriod, dashFilterUtility]);
-
-
-            // --- Actions ---
-
-            const handleAddBuilding = async (e) => {
-                e.preventDefault();
-                setIsSubmitting(true);
+                setBuildings(updatedBuildings);
+                setHistoryLog(updatedReadings);
+                saveData(DB_KEYS.BUILDINGS, updatedBuildings);
+                saveData(DB_KEYS.READINGS, updatedReadings);
                 
-                try {
-                    const newId = crypto.randomUUID();
-                    const timestamp = new Date().toISOString();
-                    
-                    const buildingEntry = {
-                        id: newId,
-                        ...newBuilding,
-                        waterRate: Number(newBuilding.waterRate) || 0,
-                        elecRate: Number(newBuilding.elecRate) || 0,
-                        gasRate: Number(newBuilding.gasRate) || 0,
-                        wasteRate: Number(newBuilding.wasteRate) || 0,
-                        createdAt: timestamp,
-                        updatedAt: timestamp
-                    };
-
-                    const updatedBuildings = [buildingEntry, ...buildings];
-                    setBuildings(updatedBuildings);
-                    setLocalData('ppm_buildings', updatedBuildings);
-
-                    // Handle Initial Readings
-                    const newReadings = [];
-                    const createInitialReading = (utility, value, rate) => {
-                        if (value && value !== '') {
-                            newReadings.push({
-                                id: crypto.randomUUID(),
-                                buildingId: newId,
-                                buildingName: newBuilding.name,
-                                utility: utility,
-                                value: Number(value),
-                                rateSnap: Number(rate) || 0,
-                                date: timestamp,
-                                previousValue: 0,
-                                usage: 0,
-                                cost: 0,
-                                vatAmount: 0,
-                                totalBill: 0,
-                                isInitial: true
-                            });
-                        }
-                    };
-
-                    if (newBuilding.hasWater) createInitialReading('water', newBuilding.initialWater, newBuilding.waterRate);
-                    if (newBuilding.hasElectricity) createInitialReading('electricity', newBuilding.initialElec, newBuilding.elecRate);
-                    if (newBuilding.hasGas) createInitialReading('gas', newBuilding.initialGas, newBuilding.gasRate);
-                    if (newBuilding.hasWaste) createInitialReading('waste', newBuilding.initialWaste, newBuilding.wasteRate);
-
-                    if (newReadings.length > 0) {
-                        const updatedHistory = [...newReadings, ...historyLog];
-                        // sort logic
-                        updatedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-                        setHistoryLog(updatedHistory);
-                        setLocalData('ppm_readings', updatedHistory);
-                    }
-
-                    setIsAddModalOpen(false);
-                    resetForm();
-                } catch (error) {
-                    console.error("Error adding building:", error);
-                    alert("Error adding building.");
-                } finally {
-                    setIsSubmitting(false);
-                }
-            };
-
-            const resetForm = () => {
+                setIsAddModalOpen(false);
                 setNewBuilding({
-                    name: '',
-                    address: '',
-                    tenantName: '',
-                    tenantEmail: '',
-                    hasWater: true,
-                    waterRate: 1.50,
-                    initialWater: '',
-                    hasElectricity: true,
-                    elecRate: 0.34,
-                    initialElec: '',
-                    hasGas: false,
-                    gasRate: 0.11,
-                    initialGas: '',
-                    hasWaste: false,
-                    wasteRate: 1.20,
-                    initialWaste: ''
+                    name: '', address: '', tenantName: '', tenantEmail: '',
+                    hasWater: true, waterRate: 1.50, initialWater: '',
+                    hasElectricity: true, elecRate: 0.34, initialElec: '',
+                    hasGas: false, gasRate: 0.11, initialGas: '',
+                    hasWaste: false, wasteRate: 1.20, initialWaste: ''
                 });
+                showToast("Unit registered in local demo storage", "success");
             };
 
-            const handleUpdateBuilding = async (e) => {
+            const handleAddReading = (e) => {
                 e.preventDefault();
-                setIsSubmitting(true);
+                const val = parseFloat(currentReading);
+                const prev = lastReading ? lastReading.reading : 0;
+                const usage = val - prev;
                 
-                try {
-                    const updatedList = buildings.map(b => {
-                        if (b.id === selectedBuilding.id) {
-                            return {
-                                ...b,
-                                ...newBuilding,
-                                waterRate: Number(newBuilding.waterRate) || 0,
-                                elecRate: Number(newBuilding.elecRate) || 0,
-                                gasRate: Number(newBuilding.gasRate) || 0,
-                                wasteRate: Number(newBuilding.wasteRate) || 0,
-                                updatedAt: new Date().toISOString()
-                            };
-                        }
-                        return b;
-                    });
-                    
-                    setBuildings(updatedList);
-                    setLocalData('ppm_buildings', updatedList);
-                    
-                    setIsEditModalOpen(false);
-                    setSelectedBuilding(null);
-                } catch (error) {
-                    console.error("Error updating building", error);
-                } finally {
-                    setIsSubmitting(false);
+                if (isNaN(val)) {
+                    showToast("Please enter a valid number", "error");
+                    return;
                 }
-            };
-
-            const handleDeleteBuilding = async (id) => {
-                if (!confirm('Are you sure you want to delete this property? This action will also delete ALL associated readings and cannot be undone.')) return;
-                setIsSubmitting(true);
-                
-                try {
-                    // Cascade delete readings
-                    const remainingReadings = historyLog.filter(r => r.buildingId !== id);
-                    setHistoryLog(remainingReadings);
-                    setLocalData('ppm_readings', remainingReadings);
-
-                    // Delete building
-                    const remainingBuildings = buildings.filter(b => b.id !== id);
-                    setBuildings(remainingBuildings);
-                    setLocalData('ppm_buildings', remainingBuildings);
-                    
-                    setIsEditModalOpen(false);
-                    setSelectedBuilding(null);
-                } catch (error) {
-                    console.error("Error deleting building:", error);
-                } finally {
-                    setIsSubmitting(false);
-                }
-            };
-
-            const handleDeleteReading = async (id) => {
-                if (!confirm('Are you sure you want to delete this reading record?')) return;
-                try {
-                    const updatedHistory = historyLog.filter(r => r.id !== id);
-                    setHistoryLog(updatedHistory);
-                    setLocalData('ppm_readings', updatedHistory);
-                } catch (error) {
-                    console.error("Error deleting reading:", error);
-                }
-            };
-
-            const openReadingModal = (building, utility) => {
-                setSelectedBuilding(building);
-                setSelectedUtility(utility);
-                setCurrentReading('');
-                setLastReading(null);
-                setIncludeVat(true); 
-                setVatRate(13.5); 
-                
-                let defaultRate = 0;
-                if (utility === 'water') defaultRate = building.waterRate;
-                else if (utility === 'electricity') defaultRate = building.elecRate;
-                else if (utility === 'gas') defaultRate = building.gasRate;
-                else if (utility === 'waste') defaultRate = building.wasteRate;
-                
-                setCustomRate((Number(defaultRate) || 0).toString());
-                
-                // Find previous reading
-                const relevantReadings = historyLog
-                    .filter(r => r.buildingId === building.id && r.utility === utility);
-                
-                // historyLog is already sorted descending by date
-                if (relevantReadings.length > 0) {
-                    setLastReading(relevantReadings[0]);
-                }
-
-                setIsReadingModalOpen(true);
-            };
-
-            const submitReading = async () => {
-                if (!currentReading || isSubmitting) return;
-                
-                setIsSubmitting(true);
-                const readingValue = parseFloat(currentReading);
-
-                if (lastReading && readingValue < lastReading.value) {
-                    alert("New reading cannot be lower than the previous reading!");
-                    setIsSubmitting(false);
+                if (usage < 0) {
+                    showToast("New reading cannot be lower than the previous one", "error");
                     return;
                 }
 
-                const usage = lastReading ? (readingValue - lastReading.value) : 0;
+                const rate = parseFloat(selectedBuilding[`${selectedUtility}Rate`]) || 0;
+                const newLog = {
+                    id: Date.now().toString(),
+                    buildingId: selectedBuilding.id,
+                    buildingName: selectedBuilding.name,
+                    utility: selectedUtility,
+                    reading: val,
+                    rate: rate,
+                    usage,
+                    cost: usage * rate,
+                    timestamp: new Date().toISOString()
+                };
+
+                const updatedReadings = [newLog, ...historyLog];
+                setHistoryLog(updatedReadings);
+                saveData(DB_KEYS.READINGS, updatedReadings);
                 
-                let rateToCharge = parseFloat(customRate);
-                if (!customRate || isNaN(rateToCharge)) {
-                    if (selectedUtility === 'water') rateToCharge = selectedBuilding.waterRate;
-                    else if (selectedUtility === 'electricity') rateToCharge = selectedBuilding.elecRate;
-                    else if (selectedUtility === 'gas') rateToCharge = selectedBuilding.gasRate;
-                    else if (selectedUtility === 'waste') rateToCharge = selectedBuilding.wasteRate;
-                    
-                    rateToCharge = Number(rateToCharge) || 0;
-                }
-
-                const subtotal = usage * rateToCharge;
-                const vatAmount = includeVat ? subtotal * (vatRate / 100) : 0;
-                const totalBill = subtotal + vatAmount;
-
-                try {
-                    const newReadingEntry = {
-                        id: crypto.randomUUID(),
-                        buildingId: selectedBuilding.id,
-                        buildingName: selectedBuilding.name,
-                        utility: selectedUtility,
-                        value: readingValue,
-                        rateSnap: rateToCharge,
-                        date: new Date().toISOString(),
-                        previousValue: lastReading ? lastReading.value : 0,
-                        usage: usage,
-                        cost: subtotal,
-                        vatRate: includeVat ? vatRate : 0,
-                        vatAmount: vatAmount,
-                        totalBill: totalBill,
-                        isInitial: false
-                    };
-                    
-                    const updatedHistory = [newReadingEntry, ...historyLog];
-                    // Keep it sorted
-                    updatedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    
-                    setHistoryLog(updatedHistory);
-                    setLocalData('ppm_readings', updatedHistory);
-                    
-                    setIsReadingModalOpen(false);
-                    
-                    if (!lastReading) {
-                        alert(`Initial ${selectedUtility} reading saved! The NEXT reading will generate a bill based on usage.`);
-                    } else {
-                        setInvoiceData({
-                            building: selectedBuilding,
-                            utility: selectedUtility,
-                            currentReading: readingValue,
-                            previousReading: lastReading.value,
-                            usage: usage,
-                            rate: rateToCharge,
-                            subtotal: subtotal,
-                            vatAmount: vatAmount,
-                            vatRate: includeVat ? vatRate : 0,
-                            total: totalBill,
-                            date: new Date()
-                        });
-                        setIsInvoiceModalOpen(true);
-                    }
-
-                } catch (error) {
-                    console.error("Error submitting reading:", error);
-                } finally {
-                    setIsSubmitting(false);
-                }
+                setIsReadingModalOpen(false);
+                showToast("Meter reading synchronised", "success");
             };
 
-            const openEditModal = (building) => {
-                setSelectedBuilding(building);
-                setNewBuilding({ 
-                    ...building, 
-                    initialWater: '', 
-                    initialElec: '',
-                    initialGas: '',
-                    initialWaste: ''
-                });
-                setIsEditModalOpen(true);
+            const handleDeleteBuilding = () => {
+                const updatedBuildings = buildings.filter(b => b.id !== selectedBuilding.id);
+                const updatedReadings = historyLog.filter(r => r.buildingId !== selectedBuilding.id);
+                setBuildings(updatedBuildings);
+                setHistoryLog(updatedReadings);
+                saveData(DB_KEYS.BUILDINGS, updatedBuildings);
+                saveData(DB_KEYS.READINGS, updatedReadings);
+                setIsEditModalOpen(false);
+                showToast("Property removed from demo", "info");
             };
 
-            // --- UI Sections ---
+            const stats = useMemo(() => {
+                const cost = historyLog.reduce((acc, curr) => acc + (parseFloat(curr.cost) || 0), 0);
+                const usage = historyLog.reduce((acc, curr) => acc + (parseFloat(curr.usage) || 0), 0);
+                return { cost, usage, count: historyLog.length };
+            }, [historyLog]);
 
-            if (loading) return <LoadingSpinner />;
+            if (loading) return null;
 
             return (
-                <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
-                    {/* Header */}
-                    <header className="bg-white shadow-sm sticky top-0 z-20">
-                        <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-blue-600 p-2 rounded-lg text-white">
-                                    <FileText size={20} />
-                                </div>
-                                <h1 className="text-xl font-bold tracking-tight text-gray-900">Paul Precision Metering</h1>
-                            </div>
-                            <button 
-                                onClick={() => {
-                                    resetForm();
-                                    setIsAddModalOpen(true);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-md transition-all active:scale-95"
-                            >
-                                <Plus size={24} />
-                            </button>
+                <div className="min-h-screen pb-28">
+                    {toast && (
+                        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl text-white shadow-2xl flex items-center gap-3 animate-in ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
+                            <Icon name={toast.type === 'error' ? 'AlertCircle' : 'Check'} size={18} />
+                            <span className="font-medium">{toast.message}</span>
                         </div>
+                    )}
+                    
+                    {/* Header */}
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-5 flex justify-between items-center backdrop-blur-md bg-white/90">
+                        <div className="flex items-center gap-4">
+                            <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                                <Icon name="Droplet" size={24} className="fill-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-slate-800">Paul Precision Metering</h1>
+                                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Demo Environment</p>
+                            </div>
+                        </div>
+                        <Button icon="Plus" onClick={() => setIsAddModalOpen(true)}>Add Unit</Button>
                     </header>
 
-                    {/* Main Content Area */}
-                    <main className="max-w-3xl mx-auto p-4 space-y-6">
-                        
-                        {/* === DASHBOARD TAB === */}
+                    <main className="max-w-6xl mx-auto p-6 space-y-8 animate-in">
+                        {/* Tab Switcher */}
+                        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-fit mx-auto sm:mx-0 shadow-inner">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
+                                { id: 'buildings', label: 'Properties', icon: 'Building2' },
+                                { id: 'history', label: 'History', icon: 'History' }
+                            ].map(t => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setActiveTab(t.id)}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                                        activeTab === t.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Icon name={t.icon} size={14} />
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+
                         {activeTab === 'dashboard' && (
-                            <div className="space-y-6 animate-in fade-in duration-300">
-                                
-                                {/* Filter Bar */}
-                                <div className="flex flex-wrap gap-2 items-center justify-between">
-                                    <h2 className="text-lg font-bold text-gray-800">Overview</h2>
-                                    <div className="flex gap-2 text-sm">
-                                        <select 
-                                            value={dashFilterPeriod}
-                                            onChange={(e) => setDashFilterPeriod(e.target.value)}
-                                            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                        >
-                                            <option value="all">All Time</option>
-                                            <option value="year">This Year</option>
-                                            <option value="month">This Month</option>
-                                        </select>
-                                        <select 
-                                            value={dashFilterUtility}
-                                            onChange={(e) => setDashFilterUtility(e.target.value)}
-                                            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                        >
-                                            <option value="all">All Utilities</option>
-                                            <option value="water">Water</option>
-                                            <option value="electricity">Electricity</option>
-                                            <option value="gas">Gas</option>
-                                            <option value="waste">Waste</option>
-                                        </select>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
+                                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
+                                    <Icon name="Euro" size={80} className="absolute -bottom-4 -right-4 opacity-10 group-hover:scale-110 transition-transform" />
+                                    <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-2 text-white/70">Total Expenditure</p>
+                                    <h3 className="text-4xl font-black">€{stats.cost.toFixed(2)}</h3>
+                                    <div className="mt-6 flex items-center gap-2 text-[10px] font-bold bg-white/20 py-1.5 px-3 rounded-full w-fit">
+                                        <Icon name="Activity" size={12} />
+                                        <span>OFFLINE SESSION ACTIVE</span>
                                     </div>
                                 </div>
-
-                                {/* Stats Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <StatCard 
-                                        title="Total Costs (Est.)" 
-                                        value={dashboardStats.totalCost.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })}
-                                        subtext={`${dashboardStats.count} records`}
-                                        icon={Euro}
-                                        colorClass="bg-green-100 text-green-700"
-                                    />
-                                    <StatCard 
-                                        title="Total Units Used" 
-                                        value={dashboardStats.totalUsage.toFixed(1)}
-                                        subtext="Across all meters"
-                                        icon={TrendingUp}
-                                        colorClass="bg-blue-100 text-blue-700"
-                                    />
-                                    <StatCard 
-                                        title="Total Properties" 
-                                        value={buildings.length}
-                                        subtext="Active buildings"
-                                        icon={LayoutDashboard}
-                                        colorClass="bg-purple-100 text-purple-700"
-                                    />
-                                </div>
-
-                                {/* Cost Breakdown */}
-                                <Card>
-                                    <h3 className="font-bold text-gray-800 mb-4">Cost Distribution</h3>
-                                    <div className="space-y-3">
-                                        {[
-                                            { key: 'electricity', label: 'Electricity', color: 'bg-amber-500', text: 'text-amber-700' },
-                                            { key: 'gas', label: 'Gas', color: 'bg-orange-500', text: 'text-orange-700' },
-                                            { key: 'water', label: 'Water', color: 'bg-blue-500', text: 'text-blue-700' },
-                                            { key: 'waste', label: 'Waste', color: 'bg-indigo-500', text: 'text-indigo-700' },
-                                        ].map((u) => {
-                                            const val = dashboardStats.utilityBreakdown[u.key];
-                                            const max = dashboardStats.totalCost || 1;
-                                            const percent = (val / max) * 100;
-                                            
-                                            return (
-                                                <div key={u.key}>
-                                                    <div className="flex justify-between text-sm mb-1">
-                                                        <span className="font-medium text-gray-600">{u.label}</span>
-                                                        <span className="font-bold text-gray-900">
-                                                            {val.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })}
-                                                        </span>
-                                                    </div>
-                                                    <div className="w-full bg-gray-100 rounded-full h-2">
-                                                        <div 
-                                                            className={`${u.color} h-2 rounded-full transition-all duration-500`} 
-                                                            style={{ width: `${percent}%` }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Total Consumption</p>
+                                    <h3 className="text-4xl font-black text-slate-800">{stats.usage.toFixed(1)} <span className="text-sm font-medium text-slate-400">units</span></h3>
+                                    <div className="mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500 rounded-full" style={{ width: '65%' }}></div>
                                     </div>
-                                </Card>
-
-                                {/* Recent Activity Preview */}
-                                <div className="flex justify-between items-center mt-4">
-                                    <h3 className="font-bold text-gray-800">Recent Activity</h3>
-                                    <button 
-                                        onClick={() => setActiveTab('history')}
-                                        className="text-blue-600 text-sm font-medium hover:underline"
-                                    >
-                                        View Full History
-                                    </button>
                                 </div>
-                                <div className="space-y-3">
-                                    {historyLog.slice(0, 3).map(log => (
-                                        <div key={log.id} className="bg-white p-3 rounded-lg border border-gray-100 flex justify-between items-center">
-                                            <div>
-                                                <p className="font-bold text-sm text-gray-800">{log.buildingName}</p>
-                                                <p className="text-xs text-gray-500 capitalize">{log.utility} • {log.usage.toFixed(1)} units</p>
-                                            </div>
-                                            <p className="font-bold text-sm text-gray-700">
-                                                {log.totalBill ? (
-                                                    Number(log.totalBill).toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })
-                                                ) : (
-                                                    ((log.usage || 0) * (log.rateSnap || 0)).toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })
-                                                )}
-                                            </p>
-                                        </div>
-                                    ))}
-                                    {historyLog.length === 0 && <p className="text-gray-400 text-center text-sm py-4">No recent activity</p>}
+                                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Active Units</p>
+                                        <h3 className="text-4xl font-black text-slate-800">{buildings.length}</h3>
+                                    </div>
+                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-4">
+                                        <Icon name="CheckCircle" size={14} className="text-emerald-500" /> Demo Persistence Enabled
+                                    </p>
                                 </div>
                             </div>
                         )}
 
-                        {/* === BUILDINGS TAB === */}
                         {activeTab === 'buildings' && (
-                            <div className="animate-in fade-in duration-300">
-                                {/* Empty State */}
-                                {buildings.length === 0 && (
-                                    <div className="text-center py-12 px-4">
-                                        <button 
-                                            onClick={() => setIsAddModalOpen(true)}
-                                            className="bg-blue-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 hover:bg-blue-100 transition-colors cursor-pointer"
-                                        >
-                                            <Plus size={40} className="text-blue-500" />
-                                        </button>
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">No Properties Yet</h3>
-                                        <p className="text-gray-500 mb-6">Add your first building to start tracking utility usage.</p>
-                                        <button 
-                                            onClick={() => setIsAddModalOpen(true)}
-                                            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium shadow-lg shadow-blue-200"
-                                        >
-                                            Add Property
-                                        </button>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in">
+                                {buildings.length === 0 ? (
+                                    <div className="col-span-full py-24 text-center bg-white rounded-[40px] border-2 border-dashed border-slate-200">
+                                        <Icon name="Building2" size={64} className="mx-auto text-slate-200 mb-6" />
+                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Workspace Empty</h3>
+                                        <p className="text-slate-500 mb-8">Register a property to begin utility monitoring.</p>
+                                        <Button icon="Plus" onClick={() => setIsAddModalOpen(true)}>Register Property</Button>
                                     </div>
-                                )}
-
-                                <div className="grid gap-4">
-                                    {buildings.map(building => (
-                                        <Card key={building.id} className="group hover:shadow-md transition-shadow">
-                                            {/* Card Header */}
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-gray-900">{building.name}</h3>
-                                                    <div className="flex items-center gap-1 text-gray-500 text-sm mt-1">
-                                                        <UserIcon size={14} />
-                                                        <span>{building.tenantName || 'No Tenant'}</span>
-                                                    </div>
-                                                    {building.address && (
-                                                        <div className="flex items-center gap-1 text-gray-400 text-xs mt-1">
-                                                            <MapPin size={12} />
-                                                            <span className="truncate max-w-[200px]">{building.address}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <button 
-                                                    onClick={() => openEditModal(building)}
-                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
-                                            </div>
-
-                                            {/* Utility Actions Grid */}
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {/* Water */}
-                                                {building.hasWater ? (
-                                                    <button 
-                                                        onClick={() => openReadingModal(building, 'water')}
-                                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-700 active:bg-blue-100 transition-colors"
-                                                    >
-                                                        <Droplets size={24} className="mb-1" />
-                                                        <span className="text-sm font-semibold">Water</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-200 text-gray-300">
-                                                        <Droplets size={24} className="mb-1 opacity-20" />
-                                                        <span className="text-xs">N/A</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Electricity */}
-                                                {building.hasElectricity ? (
-                                                    <button 
-                                                        onClick={() => openReadingModal(building, 'electricity')}
-                                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-amber-100 bg-amber-50 text-amber-700 active:bg-amber-100 transition-colors"
-                                                    >
-                                                        <Zap size={24} className="mb-1" />
-                                                        <span className="text-sm font-semibold">Electric</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-200 text-gray-300">
-                                                        <Zap size={24} className="mb-1 opacity-20" />
-                                                        <span className="text-xs">N/A</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Gas */}
-                                                {building.hasGas ? (
-                                                    <button 
-                                                        onClick={() => openReadingModal(building, 'gas')}
-                                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-orange-100 bg-orange-50 text-orange-600 active:bg-orange-100 transition-colors"
-                                                    >
-                                                        <Flame size={24} className="mb-1" />
-                                                        <span className="text-sm font-semibold">Gas</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-200 text-gray-300">
-                                                        <Flame size={24} className="mb-1 opacity-20" />
-                                                        <span className="text-xs">N/A</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Waste Water */}
-                                                {building.hasWaste ? (
-                                                    <button 
-                                                        onClick={() => openReadingModal(building, 'waste')}
-                                                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 active:bg-indigo-100 transition-colors"
-                                                    >
-                                                        <Waves size={24} className="mb-1" />
-                                                        <span className="text-sm font-semibold">Waste</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-200 text-gray-300">
-                                                        <Waves size={24} className="mb-1 opacity-20" />
-                                                        <span className="text-xs">N/A</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* === HISTORY TAB === */}
-                        {activeTab === 'history' && (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <h2 className="text-lg font-bold text-gray-800 mb-4">Reading History</h2>
-                                {historyLog.length === 0 ? (
-                                    <p className="text-gray-500 text-center py-8">No history found.</p>
                                 ) : (
-                                    historyLog.map(log => (
-                                        <div key={log.id} className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-sm text-gray-800">{log.buildingName}</span>
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full capitalize 
-                                                        ${log.utility === 'water' ? 'bg-blue-100 text-blue-700' : 
-                                                            log.utility === 'electricity' ? 'bg-amber-100 text-amber-700' :
-                                                            log.utility === 'gas' ? 'bg-orange-100 text-orange-700' :
-                                                            'bg-indigo-100 text-indigo-700'
-                                                        }`}>
-                                                        {log.utility}
-                                                    </span>
-                                                    {log.isInitial && (
-                                                        <span className="text-[10px] uppercase font-bold tracking-wider bg-gray-100 text-gray-500 px-1 rounded">Initial</span>
-                                                    )}
+                                    buildings.map(b => (
+                                        <div key={b.id} className="bg-white rounded-[32px] border border-slate-200 p-8 shadow-sm hover:shadow-md transition-all group">
+                                            <div className="flex justify-between items-start mb-8">
+                                                <div className="space-y-1">
+                                                    <h3 className="text-2xl font-black text-slate-800 group-hover:text-blue-600 transition-colors">{b.name}</h3>
+                                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                                                        <span className="flex items-center gap-1"><Icon name="MapPin" size={12} /> {b.address}</span>
+                                                        <span className="flex items-center gap-1"><Icon name="User" size={12} /> {b.tenantName}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {new Date(log.date).toLocaleDateString()}
-                                                </div>
-                                                <div className="text-xs font-mono mt-1 text-gray-600">
-                                                    Reading: {log.value} | Rate: €{Number(log.rateSnap || 0).toFixed(2)}
-                                                    {log.vatAmount > 0 && <span className="text-gray-400 ml-1">(inc. VAT)</span>}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-bold text-gray-900">
-                                                    {log.totalBill ? (
-                                                        Number(log.totalBill).toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })
-                                                    ) : (
-                                                        ((log.usage || 0) * (log.rateSnap || 0)).toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })
-                                                    )}
-                                                </span>
                                                 <button 
-                                                    onClick={() => handleDeleteReading(log.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                                    onClick={() => { setSelectedBuilding(b); setNewBuilding(b); setIsEditModalOpen(true); }}
+                                                    className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-2xl transition-all"
                                                 >
-                                                    <Trash2 size={16} />
+                                                    <Icon name="Settings" size={20} className="text-slate-300" />
                                                 </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {['water', 'electricity', 'gas', 'waste'].map(u => b[`has${u.charAt(0).toUpperCase() + u.slice(1)}`] && (
+                                                    <button 
+                                                        key={u}
+                                                        onClick={() => {
+                                                            setSelectedBuilding(b);
+                                                            setSelectedUtility(u);
+                                                            const r = historyLog.filter(l => l.buildingId === b.id && l.utility === u);
+                                                            setLastReading(r.length > 0 ? r[0] : null);
+                                                            setCurrentReading('');
+                                                            setIsReadingModalOpen(true);
+                                                        }}
+                                                        className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-left hover:border-blue-400 hover:bg-blue-50/50 transition-all group/btn"
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Icon name={u === 'electricity' ? 'Zap' : (u === 'water' ? 'Droplets' : (u === 'gas' ? 'Flame' : 'Waves'))} size={14} className="text-blue-500" />
+                                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{u}</span>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-xl font-black text-slate-800">€{parseFloat(b[`${u}Rate`]).toFixed(2)}</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
                                     ))
@@ -854,460 +418,217 @@
                             </div>
                         )}
 
-                        <div className="text-center text-xs text-gray-400 mt-8 mb-4">Created by Dave Maher</div>
+                        {activeTab === 'history' && (
+                            <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in">
+                                <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                    <h2 className="text-xl font-black text-slate-800">Record History</h2>
+                                    <div className="flex items-center gap-3 text-xs font-black text-slate-500 bg-white border border-slate-200 px-4 py-2.5 rounded-2xl shadow-sm">
+                                        <input type="checkbox" checked={includeVat} onChange={e => setIncludeVat(e.target.checked)} className="w-4 h-4 rounded text-blue-600" />
+                                        <span>VAT @ {vatRate}%</span>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                    {historyLog.length === 0 ? (
+                                        <div className="py-24 text-center text-slate-400 font-medium">No readings recorded yet.</div>
+                                    ) : (
+                                        historyLog.map(l => (
+                                            <div key={l.id} className="p-6 hover:bg-blue-50/30 cursor-pointer flex items-center justify-between transition-colors" onClick={() => {
+                                                const b = buildings.find(x => x.id === l.buildingId);
+                                                const sub = l.cost;
+                                                const vat = includeVat ? (sub * vatRate / 100) : 0;
+                                                
+                                                // Calculate Days Since Last Reading
+                                                const relatedLogs = historyLog
+                                                    .filter(h => h.buildingId === l.buildingId && h.utility === l.utility)
+                                                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                                                
+                                                const currentIndex = relatedLogs.findIndex(r => r.id === l.id);
+                                                const prevLog = relatedLogs[currentIndex + 1];
+                                                
+                                                let daysSince = 0;
+                                                if (prevLog) {
+                                                    const diffTime = Math.abs(new Date(l.timestamp) - new Date(prevLog.timestamp));
+                                                    daysSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                                                }
+
+                                                setInvoiceData({ 
+                                                    ...l, 
+                                                    building: b, 
+                                                    vatRate: includeVat ? vatRate : 0, 
+                                                    vatAmount: vat, 
+                                                    total: sub + vat, 
+                                                    date: new Date(l.timestamp),
+                                                    daysSince: daysSince
+                                                });
+                                                setIsInvoiceModalOpen(true);
+                                            }}>
+                                                <div className="flex items-center gap-6">
+                                                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500">
+                                                        <Icon name={l.utility === 'electricity' ? 'Zap' : (l.utility === 'water' ? 'Droplets' : 'Flame')} size={24} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-extrabold text-slate-800">{l.buildingName}</p>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{l.utility} • {l.usage.toFixed(1)} Units</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-black text-slate-800">€{l.cost.toFixed(2)}</p>
+                                                    <p className="text-[10px] font-black text-blue-500 uppercase">{new Date(l.timestamp).toLocaleDateString('en-GB')}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* App Footer */}
+                        <div className="text-center pt-6 pb-2">
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Created by Dave Maher</p>
+                        </div>
                     </main>
 
-                    {/* --- Modals --- */}
-                    
-                    {/* Reading Modal */}
-                    <Modal 
-                        isOpen={isReadingModalOpen} 
-                        onClose={() => setIsReadingModalOpen(false)} 
-                        title={`New ${selectedUtility ? selectedUtility.charAt(0).toUpperCase() + selectedUtility.slice(1) : ''} Reading`}
-                    >
-                        <div className="space-y-4">
-                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                <h3 className="font-bold text-gray-800">{selectedBuilding?.name}</h3>
-                                <p className="text-sm text-gray-500">
-                                    Previous Reading: {lastReading ? lastReading.value : 'None (0)'}
-                                </p>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Current Reading</label>
-                                <input 
-                                    type="number" 
-                                    autoFocus
-                                    className="w-full p-4 text-2xl font-mono border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="00000.00"
-                                    value={currentReading}
-                                    onChange={e => setCurrentReading(e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Rate (per unit)</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-3 text-gray-500">€</span>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        className="w-full p-3 pl-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={customRate}
-                                        onChange={e => setCustomRate(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={includeVat}
-                                            onChange={(e) => setIncludeVat(e.target.checked)}
-                                            className="rounded text-blue-600 focus:ring-blue-500"
-                                        />
-                                        Include VAT in Total?
-                                    </label>
-                                    {includeVat && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">Rate %</span>
-                                            <input 
-                                                type="number" 
-                                                value={vatRate}
-                                                onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
-                                                className="w-16 p-1 text-sm border rounded text-right"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <button 
-                                onClick={submitReading}
-                                disabled={!currentReading || isSubmitting}
-                                className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 disabled:opacity-70 flex justify-center items-center"
-                            >
-                                {isSubmitting ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    "Submit Reading"
-                                )}
-                            </button>
-                        </div>
-                    </Modal>
-
-                    {/* Add/Edit Building Modal */}
-                    <Modal 
-                        isOpen={isAddModalOpen || isEditModalOpen} 
-                        onClose={() => {
-                            setIsAddModalOpen(false);
-                            setIsEditModalOpen(false);
-                            resetForm();
-                        }} 
-                        title={isEditModalOpen ? "Edit Property Details" : "Add New Property"}
-                    >
-                        <form onSubmit={isEditModalOpen ? handleUpdateBuilding : handleAddBuilding} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Building/Unit Name</label>
-                                <input 
-                                    required
-                                    type="text" 
-                                    placeholder="e.g. Apt 4B, The Gables"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={newBuilding.name}
-                                    onChange={e => setNewBuilding({...newBuilding, name: e.target.value})}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Name</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="e.g. John Doe"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={newBuilding.tenantName}
-                                    onChange={e => setNewBuilding({...newBuilding, tenantName: e.target.value})}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Street Address"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={newBuilding.address}
-                                    onChange={e => setNewBuilding({...newBuilding, address: e.target.value})}
-                                />
-                            </div>
-                            
-                            <div className="bg-gray-50 p-4 rounded-lg space-y-4 max-h-[300px] overflow-y-auto">
-                                <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 pb-2">Meters Configuration</h4>
-                                
-                                {/* Water Config */}
+                    {/* Registration Modal */}
+                    <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Register New Unit" size="large">
+                        <form onSubmit={handleAddBuilding} className="space-y-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={newBuilding.hasWater}
-                                            onChange={e => setNewBuilding({...newBuilding, hasWater: e.target.checked})}
-                                            className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                                            <Droplets size={16} className="text-blue-500" /> Water Meter
-                                        </span>
-                                    </label>
-                                    
-                                    {newBuilding.hasWater && (
-                                        <div className="pl-7 grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs text-gray-500 mb-1">Rate per m³</label>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01"
-                                                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                    value={newBuilding.waterRate}
-                                                    onChange={e => setNewBuilding({...newBuilding, waterRate: e.target.value})}
-                                                />
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Friendly Name</label>
+                                    <input required className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold" value={newBuilding.name} onChange={e => setNewBuilding({...newBuilding, name: e.target.value})} placeholder="e.g. Suite 201" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Physical Address</label>
+                                    <input required className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none transition-all font-bold" value={newBuilding.address} onChange={e => setNewBuilding({...newBuilding, address: e.target.value})} placeholder="St. Patrick's Street..." />
+                                </div>
+                            </div>
+                            <div className="space-y-5">
+                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b pb-3">Utility Provisioning</h4>
+                                {['water', 'electricity', 'gas', 'waste'].map(u => {
+                                    const Key = u.charAt(0).toUpperCase() + u.slice(1);
+                                    return (
+                                        <div key={u} className="flex items-center gap-6 bg-slate-50 p-5 rounded-[24px] border border-slate-200">
+                                            <div className="flex items-center gap-4 min-w-[140px]">
+                                                <input type="checkbox" className="w-6 h-6 rounded-lg border-2" checked={newBuilding[`has${Key}`]} onChange={e => setNewBuilding({...newBuilding, [`has${Key}`]: e.target.checked})} />
+                                                <span className="text-sm font-black uppercase text-slate-700">{u}</span>
                                             </div>
-                                            {!isEditModalOpen && (
-                                                <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">Initial Reading</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="00000"
-                                                        className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                        value={newBuilding.initialWater}
-                                                        onChange={e => setNewBuilding({...newBuilding, initialWater: e.target.value})}
-                                                    />
+                                            {newBuilding[`has${Key}`] && (
+                                                <div className="flex-1 flex gap-4">
+                                                    <input type="number" step="0.001" required className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" placeholder="Rate (€)" value={newBuilding[`${u}Rate`]} onChange={e => setNewBuilding({...newBuilding, [`${u}Rate`]: e.target.value})} />
+                                                    <input type="number" step="0.01" required className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" placeholder="Initial" value={newBuilding[`initial${Key}`]} onChange={e => setNewBuilding({...newBuilding, [`initial${Key}`]: e.target.value})} />
                                                 </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-gray-200"></div>
-
-                                {/* Elec Config */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={newBuilding.hasElectricity}
-                                            onChange={e => setNewBuilding({...newBuilding, hasElectricity: e.target.checked})}
-                                            className="w-5 h-5 rounded text-amber-600 focus:ring-amber-500"
-                                        />
-                                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                                            <Zap size={16} className="text-amber-500" /> Electric Meter
-                                        </span>
-                                    </label>
-                                    
-                                    {newBuilding.hasElectricity && (
-                                        <div className="pl-7 grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs text-gray-500 mb-1">Rate per kWh</label>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01"
-                                                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                    value={newBuilding.elecRate}
-                                                    onChange={e => setNewBuilding({...newBuilding, elecRate: e.target.value})}
-                                                />
-                                            </div>
-                                            {!isEditModalOpen && (
-                                                <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">Initial Reading</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="00000"
-                                                        className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                        value={newBuilding.initialElec}
-                                                        onChange={e => setNewBuilding({...newBuilding, initialElec: e.target.value})}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-gray-200"></div>
-
-                                {/* Gas Config */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={newBuilding.hasGas}
-                                            onChange={e => setNewBuilding({...newBuilding, hasGas: e.target.checked})}
-                                            className="w-5 h-5 rounded text-orange-600 focus:ring-orange-500"
-                                        />
-                                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                                            <Flame size={16} className="text-orange-500" /> Gas Meter
-                                        </span>
-                                    </label>
-                                    
-                                    {newBuilding.hasGas && (
-                                        <div className="pl-7 grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs text-gray-500 mb-1">Rate per unit</label>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01"
-                                                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                    value={newBuilding.gasRate}
-                                                    onChange={e => setNewBuilding({...newBuilding, gasRate: e.target.value})}
-                                                />
-                                            </div>
-                                            {!isEditModalOpen && (
-                                                <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">Initial Reading</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="00000"
-                                                        className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                        value={newBuilding.initialGas}
-                                                        onChange={e => setNewBuilding({...newBuilding, initialGas: e.target.value})}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-gray-200"></div>
-
-                                {/* Waste Config */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={newBuilding.hasWaste}
-                                            onChange={e => setNewBuilding({...newBuilding, hasWaste: e.target.checked})}
-                                            className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                                            <Waves size={16} className="text-indigo-500" /> Waste Water
-                                        </span>
-                                    </label>
-                                    
-                                    {newBuilding.hasWaste && (
-                                        <div className="pl-7 grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs text-gray-500 mb-1">Rate per unit</label>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01"
-                                                    className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                    value={newBuilding.wasteRate}
-                                                    onChange={e => setNewBuilding({...newBuilding, wasteRate: e.target.value})}
-                                                />
-                                            </div>
-                                            {!isEditModalOpen && (
-                                                <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">Initial Reading</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="00000"
-                                                        className="w-full p-2 border border-gray-300 rounded bg-white"
-                                                        value={newBuilding.initialWaste}
-                                                        onChange={e => setNewBuilding({...newBuilding, initialWaste: e.target.value})}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
+                                    );
+                                })}
                             </div>
-
-                            <div className="pt-2 flex gap-3">
-                                {isEditModalOpen && (
-                                    <button 
-                                        type="button"
-                                        disabled={isSubmitting}
-                                        onClick={() => handleDeleteBuilding(selectedBuilding.id)}
-                                        className="flex-1 bg-red-50 text-red-600 py-3 rounded-lg font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
-                                    >
-                                        Delete
-                                    </button>
-                                )}
-                                <button 
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="flex-[2] bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center"
-                                >
-                                    {isSubmitting ? (
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        isEditModalOpen ? "Save Changes" : "Add Property"
-                                    )}
-                                </button>
-                            </div>
+                            <Button type="submit" className="w-full py-4 text-lg" icon="Check">Save Unit Locally</Button>
                         </form>
                     </Modal>
 
-                    {/* Invoice Modal */}
-                    <Modal 
-                        isOpen={isInvoiceModalOpen} 
-                        onClose={() => setIsInvoiceModalOpen(false)} 
-                        title="Invoice Generated"
-                    >
+                    {/* Meter Entry Modal */}
+                    <Modal isOpen={isReadingModalOpen} onClose={() => setIsReadingModalOpen(false)} title="Log Meter Reading">
+                        <form onSubmit={handleAddReading} className="space-y-8 text-center">
+                            <div className="bg-blue-50 border-2 border-blue-100 p-6 rounded-[32px] space-y-2">
+                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Previous Record</p>
+                                <p className="text-4xl font-black text-blue-800 font-mono">{(lastReading?.reading || 0).toFixed(2)}</p>
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-sm font-black text-slate-800 uppercase tracking-widest">Current Reading</label>
+                                <input required type="number" step="0.01" className="w-full p-6 text-5xl font-black text-center border-4 border-slate-100 rounded-[32px] focus:border-blue-500 outline-none font-mono" value={currentReading} onChange={e => setCurrentReading(e.target.value)} autoFocus />
+                            </div>
+                            <Button type="submit" className="w-full py-5 text-xl" icon="Save">Commit Entry</Button>
+                        </form>
+                    </Modal>
+
+                    {/* Invoice Visualiser */}
+                    <Modal isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} title="Utility Invoice" size="large">
                         {invoiceData && (
-                            <div className="space-y-6">
-                                <div id="invoice-preview" className="bg-white border p-6 rounded-lg shadow-sm overflow-hidden">
-                                    {/* Invoice Header */}
-                                    <div className="bg-blue-600 p-6 -mx-6 -mt-6 mb-6">
-                                        <div className="flex justify-between items-start text-white">
+                            <div className="space-y-8 animate-in">
+                                <div id="invoice-preview" className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-2xl">
+                                    <div className="bg-slate-900 text-white p-12 flex justify-between items-start relative overflow-hidden">
+                                        <div>
+                                            <h2 className="text-3xl font-black tracking-tighter mb-1">Paul Precision Metering</h2>
+                                            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Date: {invoiceData.date.toLocaleDateString('en-GB')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Ref No.</p>
+                                            <p className="font-mono text-xl font-bold">#{invoiceData.id.toUpperCase().slice(-8)}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-12 space-y-12">
+                                        <div className="grid grid-cols-2 gap-12">
                                             <div>
-                                                <h2 className="text-2xl font-bold">Paul Precision Metering</h2>
-                                                <p className="text-blue-100 text-sm mt-1">Utility Invoice</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Billing Unit</p>
+                                                <p className="text-2xl font-black text-slate-800">{invoiceData.building.name}</p>
+                                                <p className="text-slate-500">{invoiceData.building.address}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-mono opacity-80">{invoiceData.date.toLocaleDateString()}</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Service</p>
+                                                <p className="text-2xl font-black text-slate-800 capitalize">{invoiceData.utility}</p>
+                                                <p className="text-slate-500">Rate: €{invoiceData.rate.toFixed(3)}</p>
+                                                {invoiceData.daysSince > 0 ? (
+                                                     <p className="text-blue-600 font-bold text-sm mt-1">{invoiceData.daysSince} days since last invoice</p>
+                                                ) : (
+                                                    <p className="text-slate-400 font-medium text-sm mt-1">Initial Invoice</p>
+                                                )}
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-start mb-6 border-b pb-4">
-                                        <div className="text-right w-full">
-                                            <h3 className="font-bold text-lg text-gray-900">{invoiceData.building.name}</h3>
-                                            <p className="text-sm text-gray-600">{invoiceData.building.tenantName}</p>
-                                            <p className="text-xs text-gray-400">{invoiceData.building.address}</p>
+                                        <div className="bg-slate-50 rounded-[32px] p-8 grid grid-cols-3 gap-8 text-center border border-slate-100">
+                                            <div><p className="text-[10px] font-bold text-slate-400 uppercase">Start</p><p className="text-2xl font-black">{(invoiceData.reading - invoiceData.usage).toFixed(2)}</p></div>
+                                            <div><p className="text-[10px] font-bold text-blue-500 uppercase">End</p><p className="text-2xl font-black text-blue-600">{invoiceData.reading.toFixed(2)}</p></div>
+                                            <div><p className="text-[10px] font-bold text-slate-400 uppercase">Total</p><p className="text-2xl font-black">{invoiceData.usage.toFixed(2)}</p></div>
+                                        </div>
+                                        <div className="space-y-4 border-t-2 pt-8">
+                                            <div className="flex justify-between font-bold text-slate-500"><span>Subtotal (Excl. VAT)</span><span>€{invoiceData.cost.toFixed(2)}</span></div>
+                                            {invoiceData.vatAmount > 0 && <div className="flex justify-between font-bold text-slate-500"><span>VAT @ {invoiceData.vatRate}%</span><span>€{invoiceData.vatAmount.toFixed(2)}</span></div>}
+                                            <div className="flex justify-between items-center pt-8 border-t-2 border-slate-100 mt-6"><span className="text-2xl font-black text-slate-800">Total Due</span><span className="text-5xl font-black text-blue-600">€{invoiceData.total.toFixed(2)}</span></div>
                                         </div>
                                     </div>
-
-                                    <div className="space-y-4 mb-6">
-                                        <div className="flex justify-between items-center py-2 border-b border-dashed">
-                                            <span className="text-gray-600">Utility Type</span>
-                                            <span className="font-bold capitalize">{invoiceData.utility}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-dashed">
-                                            <span className="text-gray-600">Previous Reading</span>
-                                            <span className="font-mono">{invoiceData.previousReading}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-dashed">
-                                            <span className="text-gray-600">Current Reading</span>
-                                            <span className="font-mono">{invoiceData.currentReading}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-dashed">
-                                            <span className="text-gray-600">Usage</span>
-                                            <span className="font-bold">{invoiceData.usage.toFixed(2)} units</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b border-dashed">
-                                            <span className="text-gray-600">Rate</span>
-                                            <span className="font-mono">{invoiceData.rate.toFixed(2)} / unit</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2 pt-2 border-t">
-                                        <div className="flex justify-between items-center text-sm text-gray-600">
-                                            <span>Subtotal</span>
-                                            <span>{invoiceData.subtotal.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })}</span>
-                                        </div>
-                                        {invoiceData.vatAmount > 0 && (
-                                            <div className="flex justify-between items-center text-sm text-gray-600">
-                                                <span>VAT ({invoiceData.vatRate}%)</span>
-                                                <span>{invoiceData.vatAmount.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center pt-2">
-                                            <span className="text-xl font-bold text-gray-800">Total Due</span>
-                                            <span className="text-2xl font-bold text-blue-600">
-                                                {invoiceData.total.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' })}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <div className="bg-slate-50 p-6 text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Created by Dave Maher</div>
                                 </div>
-
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={() => setIsInvoiceModalOpen(false)}
-                                        className="flex-1 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-                                    >
-                                        Close
-                                    </button>
-                                    <button 
-                                        onClick={() => window.print()}
-                                        className="flex-1 bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-gray-900 transition-colors flex justify-center items-center gap-2"
-                                    >
-                                        <Printer size={18} /> Print Invoice
-                                    </button>
+                                <div className="flex gap-4">
+                                    <Button variant="secondary" className="flex-1 py-4" icon="Share2" onClick={() => showToast("Feature simulated in demo", "info")}>Share Copy</Button>
+                                    <Button icon="Printer" className="flex-1 py-4" onClick={() => window.print()}>Print / PDF</Button>
                                 </div>
                             </div>
                         )}
                     </Modal>
 
-                    {/* Footer Nav */}
-                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex justify-around items-center z-10">
-                        <button 
-                            onClick={() => setActiveTab('dashboard')}
-                            className={`flex flex-col items-center ${activeTab === 'dashboard' ? 'text-blue-600' : 'text-gray-400'}`}
-                        >
-                            <LayoutDashboard size={24} />
-                            <span className="text-xs mt-1">Dash</span>
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('buildings')}
-                            className={`flex flex-col items-center ${activeTab === 'buildings' ? 'text-blue-600' : 'text-gray-400'}`}
-                        >
-                            <Settings size={24} />
-                            <span className="text-xs mt-1">Manage</span>
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('history')}
-                            className={`flex flex-col items-center ${activeTab === 'history' ? 'text-blue-600' : 'text-gray-400'}`}
-                        >
-                            <History size={24} />
-                            <span className="text-xs mt-1">History</span>
-                        </button>
+                    {/* Quick Edit/Delete */}
+                    <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Manage Unit">
+                        <div className="space-y-6">
+                            <p className="text-slate-600">Permanently remove this property and all associated history?</p>
+                            <div className="flex gap-3">
+                                <Button variant="secondary" onClick={() => setIsEditModalOpen(false)} className="flex-1">Keep</Button>
+                                <Button variant="danger" onClick={handleDeleteBuilding} icon="Trash2" className="flex-1">Delete</Button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Bottom Nav */}
+                    <nav className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl border-t p-4 z-40 sm:hidden">
+                        <div className="flex justify-around">
+                            {['dashboard', 'buildings', 'history'].map(id => (
+                                <button key={id} onClick={() => setActiveTab(id)} className={`flex flex-col items-center gap-1 ${activeTab === id ? 'text-blue-600' : 'text-gray-400'}`}>
+                                    <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'History')} size={24} />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">{id}</span>
+                                </button>
+                            ))}
+                        </div>
                     </nav>
+
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-full px-4 py-3 hidden sm:flex items-center gap-2 z-50">
+                        {['dashboard', 'buildings', 'history'].map(id => (
+                            <button key={id} onClick={() => setActiveTab(id)} className={`p-3 rounded-full transition-all ${activeTab === id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
+                                <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'History')} size={20} />
+                            </button>
+                        ))}
+                    </div>
                 </div>
             );
         }
 
-        const root = createRoot(document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
