@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paul Precision Metering - Premium Utility Management</title>
     <!-- Favicon: White Water Drop in Blue Square -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232563eb'/%3E%3Cpath d='M12 22c5.5 0 10-4.5 10-10 0-5.5-10-10-10-10S2 6.5 2 12c0 5.5 4.5 10 10 10z' fill='white'/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232563eb'/%3E%3Cpath d='M12 2.6L8 7.4c-2.4 2.8-3.6 5.3-3.6 7.6 0 4.1 3.4 7.4 7.6 7.4s7.6-3.3 7.6-7.4c0-2.3-1.2-4.8-3.6-7.6L12 2.6z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E" type="image/svg+xml">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React and Babel -->
@@ -44,9 +44,10 @@
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
         // --- Demo Storage Workarounds ---
+        // Bumped version to v4 to clear any duplicate data from previous tests
         const DB_KEYS = {
-            BUILDINGS: 'pm_demo_buildings_v3', // Incremented version to ensure new schema loads
-            READINGS: 'pm_demo_readings_v3'
+            BUILDINGS: 'pm_demo_buildings_v4',
+            READINGS: 'pm_demo_readings_v4'
         };
 
         const loadData = (key) => {
@@ -171,7 +172,7 @@
             const [newBuilding, setNewBuilding] = useState({
                 name: '', address: '', tenantName: '', tenantEmail: '',
                 hasWater: true, waterRate: 1.50, initialWater: '',
-                hasElectricity: true, elecRate: 0.34, initialElec: '',
+                hasElectricity: true, electricityRate: 0.34, initialElectricity: '', // Changed elecRate to electricityRate
                 hasGas: false, gasRate: 0.11, initialGas: '',
                 hasWaste: false, wasteRate: 1.20, initialWaste: ''
             });
@@ -212,7 +213,7 @@
                 let updatedReadings = [...historyLog];
                 const utilities = [
                     { type: 'water', active: newBuilding.hasWater, val: newBuilding.initialWater, rate: newBuilding.waterRate },
-                    { type: 'electricity', active: newBuilding.hasElectricity, val: newBuilding.initialElec, rate: newBuilding.elecRate },
+                    { type: 'electricity', active: newBuilding.hasElectricity, val: newBuilding.initialElectricity, rate: newBuilding.electricityRate },
                     { type: 'gas', active: newBuilding.hasGas, val: newBuilding.initialGas, rate: newBuilding.gasRate },
                     { type: 'waste', active: newBuilding.hasWaste, val: newBuilding.initialWaste, rate: newBuilding.wasteRate }
                 ];
@@ -241,7 +242,7 @@
                 setNewBuilding({
                     name: '', address: '', tenantName: '', tenantEmail: '',
                     hasWater: true, waterRate: 1.50, initialWater: '',
-                    hasElectricity: true, elecRate: 0.34, initialElec: '',
+                    hasElectricity: true, electricityRate: 0.34, initialElectricity: '',
                     hasGas: false, gasRate: 0.11, initialGas: '',
                     hasWaste: false, wasteRate: 1.20, initialWaste: ''
                 });
@@ -263,7 +264,10 @@
                     return;
                 }
 
-                const rate = parseFloat(selectedBuilding[`${selectedUtility}Rate`]) || 0;
+                // FIX: use 'electricityRate' if utility is electricity
+                const rateKey = `${selectedUtility}Rate`;
+                const rate = parseFloat(selectedBuilding[rateKey]) || 0;
+                
                 const newLog = {
                     id: Date.now().toString(),
                     buildingId: selectedBuilding.id,
@@ -319,8 +323,6 @@
             };
 
             const stats = useMemo(() => {
-                // Filter logs based on dashboard filter if needed, but usually stats are global
-                // Let's filter stats by the dashboard utility filter too for consistency
                 let filteredLogs = historyLog;
                 if (dashFilter !== 'all') {
                     filteredLogs = historyLog.filter(l => l.utility === dashFilter);
@@ -355,8 +357,9 @@
                     {/* Header */}
                     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-5 flex justify-between items-center backdrop-blur-md bg-white/90">
                         <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                                <Icon name="Droplet" size={24} className="fill-white" />
+                            <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+                                {/* Changed to outline (text-white) instead of fill */}
+                                <Icon name="Droplet" size={24} className="text-white" />
                             </div>
                             <div>
                                 <h1 className="text-xl font-black tracking-tight text-slate-800">Paul Precision Metering</h1>
@@ -372,7 +375,7 @@
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
                                 { id: 'buildings', label: 'Properties', icon: 'Building2' },
-                                { id: 'history', label: 'History', icon: 'History' }
+                                { id: 'invoicing', label: 'Invoicing', icon: 'FileText' }
                             ].map(t => (
                                 <button
                                     key={t.id}
@@ -544,10 +547,10 @@
                             </div>
                         )}
 
-                        {activeTab === 'history' && (
+                        {activeTab === 'invoicing' && (
                             <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in">
                                 <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                    <h2 className="text-xl font-black text-slate-800">Record History</h2>
+                                    <h2 className="text-xl font-black text-slate-800">Invoicing Register</h2>
                                     <div className="flex items-center gap-3 text-xs font-black text-slate-500 bg-white border border-slate-200 px-4 py-2.5 rounded-2xl shadow-sm">
                                         <input type="checkbox" checked={includeVat} onChange={e => setIncludeVat(e.target.checked)} className="w-4 h-4 rounded text-blue-600" />
                                         <span>VAT @ {vatRate}%</span>
@@ -598,7 +601,9 @@
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-2xl font-black text-slate-800">€{l.cost.toFixed(2)}</p>
+                                                    <p className="text-2xl font-black text-slate-800">
+                                                        {l.usage === 0 ? "INITIAL READING" : `€${l.cost.toFixed(2)}`}
+                                                    </p>
                                                     <p className="text-[10px] font-black text-blue-500 uppercase">{new Date(l.timestamp).toLocaleDateString('en-GB')}</p>
                                                 </div>
                                             </div>
@@ -734,9 +739,9 @@
                     {/* Bottom Nav */}
                     <nav className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl border-t p-4 z-40 sm:hidden">
                         <div className="flex justify-around">
-                            {['dashboard', 'buildings', 'history'].map(id => (
+                            {['dashboard', 'buildings', 'invoicing'].map(id => (
                                 <button key={id} onClick={() => setActiveTab(id)} className={`flex flex-col items-center gap-1 ${activeTab === id ? 'text-blue-600' : 'text-gray-400'}`}>
-                                    <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'History')} size={24} />
+                                    <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'FileText')} size={24} />
                                     <span className="text-[10px] font-bold uppercase tracking-widest">{id}</span>
                                 </button>
                             ))}
@@ -744,9 +749,9 @@
                     </nav>
 
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-full px-4 py-3 hidden sm:flex items-center gap-2 z-50">
-                        {['dashboard', 'buildings', 'history'].map(id => (
+                        {['dashboard', 'buildings', 'invoicing'].map(id => (
                             <button key={id} onClick={() => setActiveTab(id)} className={`p-3 rounded-full transition-all ${activeTab === id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
-                                <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'History')} size={20} />
+                                <Icon name={id === 'dashboard' ? 'LayoutDashboard' : (id === 'buildings' ? 'Building2' : 'FileText')} size={20} />
                             </button>
                         ))}
                     </div>
