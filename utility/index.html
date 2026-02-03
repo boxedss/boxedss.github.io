@@ -288,7 +288,7 @@
                 showToast("Meter reading synchronised", "success");
             };
 
-            const handlePrintInvoice = () => {
+            const markAsSent = () => {
                 // 1. Update the building's lastInvoiced date for this utility
                 const updatedBuildings = buildings.map(b => {
                     if (b.id === invoiceData.buildingId) {
@@ -305,10 +305,18 @@
                 
                 setBuildings(updatedBuildings);
                 saveData(DB_KEYS.BUILDINGS, updatedBuildings);
-                
-                // 2. Print
-                window.print();
-                showToast("Invoice recorded and printed", "success");
+                return updatedBuildings;
+            };
+
+            const handlePrintInvoice = () => {
+                markAsSent();
+                setTimeout(() => window.print(), 100); // Slight delay to allow state update
+                showToast("Invoice marked as sent and printed", "success");
+            };
+
+            const handleShareInvoice = () => {
+                markAsSent();
+                showToast("Invoice marked as sent (Share simulated)", "success");
             };
 
             const handleDeleteBuilding = () => {
@@ -462,10 +470,12 @@
                                                             
                                                             let statusColor = "bg-red-500"; // Default > 31 or null
                                                             let statusText = "Overdue / Never";
+                                                            let showTick = false;
                                                             
                                                             if (days < 25) {
                                                                 statusColor = "bg-emerald-500";
                                                                 statusText = `${days} days ago`;
+                                                                showTick = true;
                                                             } else if (days <= 31) {
                                                                 statusColor = "bg-orange-500";
                                                                 statusText = "Due Soon";
@@ -473,9 +483,12 @@
 
                                                             return (
                                                                 <div key={u} className="flex items-center gap-2 bg-slate-100 rounded-full pl-2 pr-4 py-1.5 border border-slate-200">
-                                                                    <div className={`w-3 h-3 rounded-full ${statusColor} shadow-sm`}></div>
+                                                                    <div className={`w-3 h-3 rounded-full ${statusColor} shadow-sm flex items-center justify-center`}></div>
                                                                     <div className="flex flex-col leading-none">
-                                                                        <span className="text-[10px] font-bold uppercase text-slate-600">{u}</span>
+                                                                        <span className="text-[10px] font-bold uppercase text-slate-600 flex items-center gap-1">
+                                                                            {u}
+                                                                            {showTick && <Icon name="Check" size={10} className="text-emerald-600 stroke-[4]" />}
+                                                                        </span>
                                                                         <span className="text-[9px] font-medium text-slate-400">{statusText}</span>
                                                                     </div>
                                                                 </div>
@@ -718,7 +731,7 @@
                                     <div className="bg-slate-50 p-6 text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Created by Dave Maher</div>
                                 </div>
                                 <div className="flex gap-4">
-                                    <Button variant="secondary" className="flex-1 py-4" icon="Share2" onClick={() => showToast("Feature simulated in demo", "info")}>Share Copy</Button>
+                                    <Button variant="secondary" className="flex-1 py-4" icon="Share2" onClick={handleShareInvoice}>Share Copy</Button>
                                     <Button icon="Printer" className="flex-1 py-4" onClick={handlePrintInvoice}>Print / PDF</Button>
                                 </div>
                             </div>
