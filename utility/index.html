@@ -26,9 +26,28 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
         @media print {
+            @page { margin: 0; size: auto; }
+            body { margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             body * { visibility: hidden; }
-            #invoice-preview, #invoice-preview * { visibility: visible; }
-            #invoice-preview { position: absolute; left: 0; top: 0; width: 100%; border: none; box-shadow: none; }
+            #invoice-preview, #invoice-preview * { 
+                visibility: visible; 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important;
+            }
+            #invoice-preview { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                margin: 0; 
+                border: none; 
+                box-shadow: none; 
+                border-radius: 0;
+            }
+            /* Force background colors for printers that strip them by default */
+            .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
+            .bg-slate-50 { background-color: #f8fafc !important; }
+            .bg-blue-600 { background-color: #2563eb !important; }
         }
     </style>
 </head>
@@ -44,10 +63,10 @@
         const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
         // --- Demo Storage Workarounds ---
-        // Bumped version to v4 to clear any duplicate data from previous tests
+        // Bumped version to v5 to clear any duplicate data from previous tests
         const DB_KEYS = {
-            BUILDINGS: 'pm_demo_buildings_v4',
-            READINGS: 'pm_demo_readings_v4'
+            BUILDINGS: 'pm_demo_buildings_v5',
+            READINGS: 'pm_demo_readings_v5'
         };
 
         const loadData = (key) => {
@@ -195,7 +214,7 @@
             const getDaysSince = (dateString) => {
                 if (!dateString) return null;
                 const diffTime = Math.abs(new Date() - new Date(dateString));
-                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return Math.floor(diffTime / (1000 * 60 * 60 * 24));
             };
 
             const handleAddBuilding = (e) => {
@@ -265,7 +284,7 @@
                 }
 
                 // FIX: use 'electricityRate' if utility is electricity
-                const rateKey = `${selectedUtility}Rate`;
+                const rateKey = selectedUtility === 'electricity' ? 'electricityRate' : `${selectedUtility}Rate`;
                 const rate = parseFloat(selectedBuilding[rateKey]) || 0;
                 
                 const newLog = {
@@ -366,8 +385,8 @@
                     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-5 flex justify-between items-center backdrop-blur-md bg-white/90">
                         <div className="flex items-center gap-4">
                             <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
-                                {/* Changed to outline (text-white) instead of fill */}
-                                <Icon name="Droplet" size={24} className="text-white" />
+                                {/* SVG Inline: White outline water drop */}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-droplet"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>
                             </div>
                             <div>
                                 <h1 className="text-xl font-black tracking-tight text-slate-800">Paul Precision Metering</h1>
@@ -549,7 +568,7 @@
                                                             <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{u}</span>
                                                         </div>
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-slate-800">€{parseFloat(b[`${u}Rate`]).toFixed(2)}</span>
+                                                            <span className="text-xl font-black text-slate-800">€{parseFloat(b[`${u === 'electricity' ? 'electricity' : u}Rate`]).toFixed(2)}</span>
                                                         </div>
                                                     </button>
                                                 ))}
