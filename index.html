@@ -39,14 +39,15 @@
     <style>
         body { background-color: #09090b; color: #fff; }
         
-        /* Custom Scrollbar - Made slightly lighter/wider for better visibility */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #52525b; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #71717a; }
+        /* Custom Scrollbar - Darker for visibility on white/light panels */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 4px; }
+        /* Changed to Zinc-600 (#52525b) for better contrast on white */
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #52525b; border-radius: 4px; border: 2px solid rgba(0,0,0,0.05); background-clip: padding-box; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; border: 2px solid rgba(0,0,0,0.05); }
         
         /* Firefox Scrollbar */
-        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #52525b rgba(255,255,255,0.05); }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #52525b rgba(0,0,0,0.05); }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -276,6 +277,10 @@
                     const darkColor = color.clone().multiplyScalar(0.7);
                     const chromeColor = new THREE.Color(0xdddddd);
                     const blackColor = new THREE.Color(0x555555); 
+                    
+                    // --- RED MATERIAL FOR BIKES & MOWERS ---
+                    const redMaterial = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.5 }); // Tailwind red-600
+
                     const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6 });
                     const darkMaterial = new THREE.MeshStandardMaterial({ color: darkColor, roughness: 0.8 });
                     const chromeMaterial = new THREE.MeshStandardMaterial({ color: chromeColor, roughness: 0.2, metalness: 0.8 });
@@ -356,22 +361,29 @@
                             group.add(createBox(legW, legH, legD, -w/2 + legW, legH/2, d/2 - legD));
                             group.add(createBox(legW, legH, legD, w/2 - legW, legH/2, d/2 - legD));
                             break;
+                        
+                        // --- UPDATED BIKE WITH RED MATERIAL ---
                         case 'bike':
                             const wheelRad = h * 0.35;
                             group.add(createCylinder(wheelRad, w*0.02, -w*0.35, wheelRad, 0, Math.PI/2, 0, blackMaterial)); 
                             group.add(createCylinder(wheelRad, w*0.02, w*0.35, wheelRad, 0, Math.PI/2, 0, blackMaterial)); 
                             const frameThick = h * 0.05;
-                            group.add(createBox(w*0.5, frameThick, frameThick, 0, h*0.5, 0, color)); 
-                            group.add(createBox(frameThick, h*0.6, frameThick, 0, h*0.4, 0, color)); 
+                            // Using redMaterial here
+                            group.add(createBox(w*0.5, frameThick, frameThick, 0, h*0.5, 0, redMaterial)); 
+                            group.add(createBox(frameThick, h*0.6, frameThick, 0, h*0.4, 0, redMaterial)); 
                             group.add(createBox(w*0.05, frameThick, d*0.6, w*0.3, h*0.8, 0, chromeMaterial));
                             break;
+                        
+                        // --- UPDATED LAWNMOWER WITH RED MATERIAL ---
                         case 'lawnmower':
-                            group.add(createBox(w, h*0.4, d, 0, h*0.2, 0, color));
+                            // Using redMaterial here
+                            group.add(createBox(w, h*0.4, d, 0, h*0.2, 0, redMaterial));
                             group.add(createBox(w*0.6, h*0.3, d*0.6, 0, h*0.5, 0, blackMaterial));
                             const handleH = h;
                             group.add(createBox(w*0.05, h*0.8, d*0.05, -w*0.4, h*0.6, 0, chromeMaterial)); 
                             group.add(createBox(w*0.1, w*0.05, d*0.8, -w*0.5, h*0.9, 0, blackMaterial)); 
                             break;
+                            
                         case 'beanbag':
                             group.add(createCylinder(w*0.5, h*0.8, 0, h*0.4, 0, 0, 0, color));
                             break;
@@ -555,7 +567,7 @@
                                             </PremiumButton>
                                         ))}
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3 max-h-[450px] overflow-y-auto pr-1 custom-scrollbar pb-2">
+                                    <div className="grid grid-cols-2 gap-3 pb-2">
                                         {ROOM_CATEGORIES[activeTab].map(item => {
                                             const count = itemCounts[item.id] || 0;
                                             return (
@@ -580,7 +592,7 @@
                             </PremiumCard>
 
                             <PremiumCard className="h-[350px] flex flex-col p-1">
-                                <div className="bg-white/95 flex-1 p-5 rounded-xl flex flex-col min-h-0">
+                                <div className="bg-white/95 flex-1 p-5 rounded-xl flex flex-col min-h-0 h-full">
                                     <div className="flex justify-between items-center mb-4 border-b border-zinc-100 pb-3">
                                         <h3 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wide text-zinc-900"><ICONS.Truck /> Your Items</h3>
                                         {inventory.length > 0 && <button onClick={clearAll} className="text-[10px] text-red-500 hover:text-red-600 flex items-center gap-1 font-bold uppercase transition-colors hover:bg-red-50 px-2 py-1 rounded-md"><ICONS.Trash /> Clear</button>}
