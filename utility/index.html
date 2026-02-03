@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paul Precision Metering</title>
+    <title>Paul Precision Metering (Demo)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Babel for JSX transformation (Pinned to 7.23.6 to fix ES modules target error) -->
+    <!-- Babel for JSX transformation (Pinned to 7.23.6) -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
 
     <!-- Font -->
@@ -17,16 +17,13 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 
-    <!-- Import Map for React, Lucide, and Firebase -->
+    <!-- Import Map for React and Lucide (No Firebase) -->
     <script type="importmap">
     {
         "imports": {
             "react": "https://esm.sh/react@18.2.0",
             "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.292.0",
-            "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
         }
     }
     </script>
@@ -34,44 +31,9 @@
 <body class="bg-gray-50">
     <div id="root"></div>
 
-    <!-- Configuration Placeholder - REPLACE WITH YOUR REAL FIREBASE CONFIG -->
-    <script>
-        // REPLACE THE VALUES BELOW WITH YOUR REAL FIREBASE CONFIGURATION
-        window.__firebase_config = JSON.stringify({
-            apiKey: "YOUR_API_KEY_HERE",
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project-id",
-            storageBucket: "your-project.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
-        });
-        window.__app_id = "paul-precision-metering";
-        window.__initial_auth_token = ""; // Optional custom token
-    </script>
-
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { initializeApp } from 'firebase/app';
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            onAuthStateChanged,
-            signInWithCustomToken
-        } from 'firebase/auth';
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            query, 
-            where, 
-            updateDoc, 
-            deleteDoc, 
-            doc, 
-            serverTimestamp,
-            getDocs,
-            onSnapshot
-        } from 'firebase/firestore';
         import { 
             Plus, 
             Droplets, 
@@ -92,12 +54,24 @@
             Euro
         } from 'lucide-react';
 
-        // --- Firebase Configuration ---
-        const firebaseConfig = JSON.parse(window.__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+        // --- Local Storage Helpers ---
+        const getLocalData = (key) => {
+            try {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : [];
+            } catch (error) {
+                console.error("Error reading local storage", error);
+                return [];
+            }
+        };
+
+        const setLocalData = (key, data) => {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (error) {
+                console.error("Error writing to local storage", error);
+            }
+        };
 
         // --- Components ---
 
@@ -148,9 +122,10 @@
         // --- Main Application Component ---
 
         function App() {
-            const [user, setUser] = useState(null);
+            // App State
             const [activeTab, setActiveTab] = useState('dashboard');
             const [buildings, setBuildings] = useState([]);
+            const [historyLog, setHistoryLog] = useState([]);
             const [loading, setLoading] = useState(true);
             
             // Modal States
@@ -159,11 +134,8 @@
             const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
             const [isEditModalOpen, setIsEditModalOpen] = useState(false);
             
-            // Data States
-            const [historyLog, setHistoryLog] = useState([]);
+            // Interaction States
             const [isSubmitting, setIsSubmitting] = useState(false);
-
-            // Active Selection States
             const [selectedBuilding, setSelectedBuilding] = useState(null);
             const [selectedUtility, setSelectedUtility] = useState(null);
             const [lastReading, setLastReading] = useState(null);
@@ -205,80 +177,25 @@
             
             const [invoiceData, setInvoiceData] = useState(null);
 
-            // --- Auth & Data Loading ---
-
+            // --- Load Data on Mount ---
             useEffect(() => {
-                const initAuth = async () => {
-                    if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-                        await signInWithCustomToken(auth, window.__initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
+                const loadData = () => {
+                    const loadedBuildings = getLocalData('ppm_buildings');
+                    // Sort by newest
+                    loadedBuildings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    
+                    const loadedHistory = getLocalData('ppm_readings');
+                    // Sort by newest
+                    loadedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    setBuildings(loadedBuildings);
+                    setHistoryLog(loadedHistory);
+                    setLoading(false);
                 };
-                initAuth();
                 
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    setUser(currentUser);
-                    if (!currentUser) setLoading(false);
-                });
-                return () => unsubscribe();
+                // Simulate a tiny network delay for realism
+                setTimeout(loadData, 500);
             }, []);
-
-            // Fetch Buildings
-            useEffect(() => {
-                if (!user) return;
-
-                const q = query(
-                    collection(db, 'artifacts', appId, 'users', user.uid, 'buildings')
-                );
-
-                const unsubscribe = onSnapshot(q, 
-                    (snapshot) => {
-                        const buildingsData = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        buildingsData.sort((a, b) => {
-                                const timeA = a.createdAt?.seconds || 0;
-                                const timeB = b.createdAt?.seconds || 0;
-                                return timeB - timeA;
-                        });
-                        setBuildings(buildingsData);
-                        setLoading(false);
-                    },
-                    (error) => {
-                        console.error("Error fetching buildings:", error);
-                        setLoading(false);
-                    }
-                );
-
-                return () => unsubscribe();
-            }, [user]);
-
-            // Fetch Readings (Always fetch for dashboard stats)
-            useEffect(() => {
-                if (!user) return;
-
-                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'readings'));
-                
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const logs = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                    logs.sort((a, b) => {
-                        const dateA = a.date?.toDate ? a.date.toDate() : (a.date ? new Date(a.date) : new Date(0));
-                        const dateB = b.date?.toDate ? b.date.toDate() : (b.date ? new Date(b.date) : new Date(0));
-                        return dateB - dateA;
-                    });
-
-                    setHistoryLog(logs);
-                });
-
-                return () => unsubscribe();
-            }, [user]);
-
 
             // --- Computed Dashboard Stats ---
 
@@ -289,12 +206,12 @@
                 // Time Filter
                 if (dashFilterPeriod === 'month') {
                     filteredLogs = filteredLogs.filter(log => {
-                        const d = log.date?.toDate ? log.date.toDate() : new Date(log.date);
+                        const d = new Date(log.date);
                         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
                     });
                 } else if (dashFilterPeriod === 'year') {
                     filteredLogs = filteredLogs.filter(log => {
-                        const d = log.date?.toDate ? log.date.toDate() : new Date(log.date);
+                        const d = new Date(log.date);
                         return d.getFullYear() === now.getFullYear();
                     });
                 }
@@ -337,51 +254,67 @@
 
             const handleAddBuilding = async (e) => {
                 e.preventDefault();
-                if (!user || isSubmitting) return;
-
                 setIsSubmitting(true);
+                
                 try {
-                    const buildingRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'buildings'), {
+                    const newId = crypto.randomUUID();
+                    const timestamp = new Date().toISOString();
+                    
+                    const buildingEntry = {
+                        id: newId,
                         ...newBuilding,
                         waterRate: Number(newBuilding.waterRate) || 0,
                         elecRate: Number(newBuilding.elecRate) || 0,
                         gasRate: Number(newBuilding.gasRate) || 0,
                         wasteRate: Number(newBuilding.wasteRate) || 0,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
+                        createdAt: timestamp,
+                        updatedAt: timestamp
+                    };
 
-                    const readingsCollection = collection(db, 'artifacts', appId, 'users', user.uid, 'readings');
-                    
-                    const createInitialReading = async (utility, value, rate) => {
+                    const updatedBuildings = [buildingEntry, ...buildings];
+                    setBuildings(updatedBuildings);
+                    setLocalData('ppm_buildings', updatedBuildings);
+
+                    // Handle Initial Readings
+                    const newReadings = [];
+                    const createInitialReading = (utility, value, rate) => {
                         if (value && value !== '') {
-                            await addDoc(readingsCollection, {
-                                buildingId: buildingRef.id,
+                            newReadings.push({
+                                id: crypto.randomUUID(),
+                                buildingId: newId,
                                 buildingName: newBuilding.name,
                                 utility: utility,
                                 value: Number(value),
                                 rateSnap: Number(rate) || 0,
-                                date: serverTimestamp(),
+                                date: timestamp,
                                 previousValue: 0,
                                 usage: 0,
                                 cost: 0,
                                 vatAmount: 0,
                                 totalBill: 0,
-                                isInitial: true 
+                                isInitial: true
                             });
                         }
                     };
 
-                    if (newBuilding.hasWater) await createInitialReading('water', newBuilding.initialWater, newBuilding.waterRate);
-                    if (newBuilding.hasElectricity) await createInitialReading('electricity', newBuilding.initialElec, newBuilding.elecRate);
-                    if (newBuilding.hasGas) await createInitialReading('gas', newBuilding.initialGas, newBuilding.gasRate);
-                    if (newBuilding.hasWaste) await createInitialReading('waste', newBuilding.initialWaste, newBuilding.wasteRate);
+                    if (newBuilding.hasWater) createInitialReading('water', newBuilding.initialWater, newBuilding.waterRate);
+                    if (newBuilding.hasElectricity) createInitialReading('electricity', newBuilding.initialElec, newBuilding.elecRate);
+                    if (newBuilding.hasGas) createInitialReading('gas', newBuilding.initialGas, newBuilding.gasRate);
+                    if (newBuilding.hasWaste) createInitialReading('waste', newBuilding.initialWaste, newBuilding.wasteRate);
+
+                    if (newReadings.length > 0) {
+                        const updatedHistory = [...newReadings, ...historyLog];
+                        // sort logic
+                        updatedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        setHistoryLog(updatedHistory);
+                        setLocalData('ppm_readings', updatedHistory);
+                    }
 
                     setIsAddModalOpen(false);
                     resetForm();
                 } catch (error) {
                     console.error("Error adding building:", error);
-                    alert("Error adding building. Please try again.");
+                    alert("Error adding building.");
                 } finally {
                     setIsSubmitting(false);
                 }
@@ -410,19 +343,27 @@
 
             const handleUpdateBuilding = async (e) => {
                 e.preventDefault();
-                if (!user || !selectedBuilding || isSubmitting) return;
-
                 setIsSubmitting(true);
+                
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'buildings', selectedBuilding.id);
-                    await updateDoc(docRef, {
-                        ...newBuilding,
-                        waterRate: Number(newBuilding.waterRate) || 0,
-                        elecRate: Number(newBuilding.elecRate) || 0,
-                        gasRate: Number(newBuilding.gasRate) || 0,
-                        wasteRate: Number(newBuilding.wasteRate) || 0,
-                        updatedAt: serverTimestamp()
+                    const updatedList = buildings.map(b => {
+                        if (b.id === selectedBuilding.id) {
+                            return {
+                                ...b,
+                                ...newBuilding,
+                                waterRate: Number(newBuilding.waterRate) || 0,
+                                elecRate: Number(newBuilding.elecRate) || 0,
+                                gasRate: Number(newBuilding.gasRate) || 0,
+                                wasteRate: Number(newBuilding.wasteRate) || 0,
+                                updatedAt: new Date().toISOString()
+                            };
+                        }
+                        return b;
                     });
+                    
+                    setBuildings(updatedList);
+                    setLocalData('ppm_buildings', updatedList);
+                    
                     setIsEditModalOpen(false);
                     setSelectedBuilding(null);
                 } catch (error) {
@@ -434,27 +375,23 @@
 
             const handleDeleteBuilding = async (id) => {
                 if (!confirm('Are you sure you want to delete this property? This action will also delete ALL associated readings and cannot be undone.')) return;
-                if (isSubmitting) return;
-
                 setIsSubmitting(true);
+                
                 try {
-                    const readingsQuery = query(
-                        collection(db, 'artifacts', appId, 'users', user.uid, 'readings'),
-                        where('buildingId', '==', id)
-                    );
-                    
-                    const snapshot = await getDocs(readingsQuery);
-                    
-                    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
-                    await Promise.all(deletePromises);
+                    // Cascade delete readings
+                    const remainingReadings = historyLog.filter(r => r.buildingId !== id);
+                    setHistoryLog(remainingReadings);
+                    setLocalData('ppm_readings', remainingReadings);
 
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'buildings', id));
+                    // Delete building
+                    const remainingBuildings = buildings.filter(b => b.id !== id);
+                    setBuildings(remainingBuildings);
+                    setLocalData('ppm_buildings', remainingBuildings);
                     
                     setIsEditModalOpen(false);
                     setSelectedBuilding(null);
                 } catch (error) {
-                    console.error("Error deleting building and data:", error);
-                    alert("Failed to delete building completely. Please try again.");
+                    console.error("Error deleting building:", error);
                 } finally {
                     setIsSubmitting(false);
                 }
@@ -463,14 +400,15 @@
             const handleDeleteReading = async (id) => {
                 if (!confirm('Are you sure you want to delete this reading record?')) return;
                 try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'readings', id));
+                    const updatedHistory = historyLog.filter(r => r.id !== id);
+                    setHistoryLog(updatedHistory);
+                    setLocalData('ppm_readings', updatedHistory);
                 } catch (error) {
                     console.error("Error deleting reading:", error);
-                    alert("Failed to delete reading.");
                 }
             };
 
-            const openReadingModal = async (building, utility) => {
+            const openReadingModal = (building, utility) => {
                 setSelectedBuilding(building);
                 setSelectedUtility(utility);
                 setCurrentReading('');
@@ -485,22 +423,21 @@
                 else if (utility === 'waste') defaultRate = building.wasteRate;
                 
                 setCustomRate((Number(defaultRate) || 0).toString());
-                setIsReadingModalOpen(true);
-
-                try {
-                    const relevantReadings = historyLog
-                        .filter(r => r.buildingId === building.id && r.utility === utility);
-
-                    if (relevantReadings.length > 0) {
-                        setLastReading(relevantReadings[0]);
-                    }
-                } catch (error) {
-                    console.error("Error fetching last reading:", error);
+                
+                // Find previous reading
+                const relevantReadings = historyLog
+                    .filter(r => r.buildingId === building.id && r.utility === utility);
+                
+                // historyLog is already sorted descending by date
+                if (relevantReadings.length > 0) {
+                    setLastReading(relevantReadings[0]);
                 }
+
+                setIsReadingModalOpen(true);
             };
 
             const submitReading = async () => {
-                if (!currentReading || !user || isSubmitting) return;
+                if (!currentReading || isSubmitting) return;
                 
                 setIsSubmitting(true);
                 const readingValue = parseFloat(currentReading);
@@ -528,13 +465,14 @@
                 const totalBill = subtotal + vatAmount;
 
                 try {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'readings'), {
+                    const newReadingEntry = {
+                        id: crypto.randomUUID(),
                         buildingId: selectedBuilding.id,
                         buildingName: selectedBuilding.name,
                         utility: selectedUtility,
                         value: readingValue,
                         rateSnap: rateToCharge,
-                        date: serverTimestamp(),
+                        date: new Date().toISOString(),
                         previousValue: lastReading ? lastReading.value : 0,
                         usage: usage,
                         cost: subtotal,
@@ -542,7 +480,14 @@
                         vatAmount: vatAmount,
                         totalBill: totalBill,
                         isInitial: false
-                    });
+                    };
+                    
+                    const updatedHistory = [newReadingEntry, ...historyLog];
+                    // Keep it sorted
+                    updatedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    setHistoryLog(updatedHistory);
+                    setLocalData('ppm_readings', updatedHistory);
                     
                     setIsReadingModalOpen(false);
                     
@@ -881,7 +826,7 @@
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-gray-500 mt-1">
-                                                    {log.date?.toDate ? log.date.toDate().toLocaleDateString() : 'Unknown Date'}
+                                                    {new Date(log.date).toLocaleDateString()}
                                                 </div>
                                                 <div className="text-xs font-mono mt-1 text-gray-600">
                                                     Reading: {log.value} | Rate: €{Number(log.rateSnap || 0).toFixed(2)}
