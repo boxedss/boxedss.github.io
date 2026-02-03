@@ -517,7 +517,10 @@
                 
                 const fullText = `Recommended Units: ${roomSummary}\n\nInventory:\n${itemsList}\n\nTotal Volume: ${vol.toFixed(2)}m³`;
                 const encoded = encodeURIComponent(fullText);
-                window.open(`https://boxedstorage.ie/get-a-quote/?storage_quote_data=${encoded}`, '_blank');
+                
+                // Using the specific field ID/Name provided by the user for pre-population
+                // Most form builders allow pre-populating via URL query params matching the field name.
+                window.open(`https://boxedstorage.ie/get-a-quote/?hJ9GZoRmdV6kGDktLZAo=${encoded}`, '_blank');
             };
 
             return (
